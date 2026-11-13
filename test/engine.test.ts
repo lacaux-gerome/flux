@@ -375,6 +375,7 @@ describe('tickets', () => {
     expect(todo.signals[0]).toMatchObject({ rank: 6, weight: 1, detail: 'Todo Weekly' })
     const started = itemFromTicket(ticket({ stateName: 'In Progress', stateType: 'started' }), context)
     expect(started.signals[0].weight).toBeLessThan(todo.signals[0].weight)
+    expect(todo.state).toBe('Todo Weekly')
   })
 
   it('garde en attente un ticket où ma question attend une réponse, backlog compris', () => {

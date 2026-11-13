@@ -43,6 +43,8 @@ export interface Item {
   title: string
   url: string
   branch?: string
+  // Ticket: the column it sits in on the board (« In Review »)
+  state?: string
   terminal: boolean
   ball: 'me' | 'others' | 'dormant' | 'parked'
   // My PR or a ticket assigned to me, as opposed to someone else's I take part in

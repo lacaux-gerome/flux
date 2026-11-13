@@ -7,6 +7,16 @@ import { displayTitle, waitingFor } from './format'
 import { looseId, menuOfItem, menuOfView, showMenu } from './navigation'
 import { rankStyle, tint } from './rankStyle'
 
+// The board column, the first to shrink when the card runs out of room
+function StateTag({ state }: { state?: string }) {
+  if (!state) return null
+  return (
+    <span className="card-state" title={`Statut : ${state}`}>
+      {state}
+    </span>
+  )
+}
+
 interface CardProps {
   view: TopicView
   selected: boolean
@@ -18,6 +28,7 @@ function Card({ view, selected, fresh, onSelect }: CardProps) {
   const element = useRef<HTMLButtonElement>(null)
   const busy = view.threads.some(thread => thread.status === 'busy')
   const ref = view.topic.links[0] ?? 'Note'
+  const state = view.items.find(item => item.kind === 'ticket' && item.state)?.state
 
   useEffect(() => {
     if (selected) {
@@ -38,6 +49,7 @@ function Card({ view, selected, fresh, onSelect }: CardProps) {
       {fresh && <span className="badge">Nouveau</span>}
       <span className="card-head">
         <strong>{ref}</strong>
+        <StateTag state={state} />
         {busy && <Bot size={14} aria-label="Agent au travail" />}
         <span className="age">{waitingFor(view.since)}</span>
       </span>
@@ -76,6 +88,7 @@ function LooseCard({ item, selected, onSelect }: LooseCardProps) {
           <LinkIcon url={item.url} size={12} />
           {item.ref}
         </strong>
+        <StateTag state={item.state} />
         {item.asked && <span className="age">{waitingFor(item.asked.at)}</span>}
       </span>
       <span className="card-title">{displayTitle(item.title)}</span>

@@ -301,6 +301,7 @@ export function itemFromTicket(ticket: Ticket, ctx: RankContext): Item {
     kind: 'ticket' as const,
     title: ticket.title,
     url: ticket.url,
+    ...(ticket.stateName ? { state: ticket.stateName } : {}),
     mine: ticket.assignedToMe,
   }
   if (CLOSED_STATE_TYPES.has(ticket.stateType)) {
