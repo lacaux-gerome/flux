@@ -113,6 +113,23 @@ describe('règles unitaires', () => {
     expect(item.signals[0]).toMatchObject({ rank: 6, detail: 'Brouillon' })
   })
 
+  it('garde dans mes sujets ma PR ouverte sans ticket, jusqu’à son merge', () => {
+    const e2e = { title: 'ci(e2e): réutiliser le build', headRefName: 'ci/e2e-build-cache' }
+    const item = itemFromPullRequest(pr(e2e), context)
+    expect(item).toMatchObject({ ball: 'me', refs: ['mobile#1'] })
+    expect(item.signals).toEqual([expect.objectContaining({ rank: 6, detail: 'PR ouverte', action: 'fix-pr' })])
+    const created = reconcile([], [item], [], NOW).created
+    expect(created.map(topic => topic.links)).toEqual([['mobile#1']])
+
+    // Something to do on it takes over, a ticket keeps its own place, and only my PRs count
+    expect(itemFromPullRequest(pr({ ...e2e, ci: 'FAILURE' }), context).signals.map(s => s.detail)).toEqual(['CI en échec'])
+    expect(itemFromPullRequest(pr({ ...e2e, headRefName: 'feature/app-12-e2e' }), context).ball).toBe('others')
+    expect(itemFromPullRequest(pr({ ...e2e, author: 'sam' }), context).signals).toEqual([])
+    // Left aside for long, it goes to the wrap-up like any other
+    expect(itemFromPullRequest(pr({ ...e2e, updatedAt: '2026-10-01T09:00:00Z' }), context).ball).toBe('dormant')
+    expect(itemFromPullRequest(pr({ ...e2e, state: 'MERGED' }), context).terminal).toBe(true)
+  })
+
   it("n'alerte pas sur une review en cours de rédaction", () => {
     const item = itemFromPullRequest(
       pr({

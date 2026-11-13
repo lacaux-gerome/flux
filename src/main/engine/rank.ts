@@ -283,6 +283,11 @@ export function itemFromPullRequest(pr: PullRequest, ctx: RankContext): Item {
     if (base.mine && !stale) signals.push(...mineSignals(pr, ref, ctx))
     if (!base.mine) signals.push(...theirSignals(pr, ref, ctx))
   }
+  // My PR with no ticket behind it, end-to-end tests for instance: no ticket state keeps it among my
+  // topics, so the PR itself does until it lands
+  if (base.mine && !blocked && !stale && refs.length === 1 && signals.length === 0) {
+    signals.push(signal(ref, 'open', 6, 'PR ouverte', 'fix-pr', pr.updatedAt))
+  }
 
   const ball = signals.length > 0 ? 'me' : blocked || stale ? 'dormant' : 'others'
   return { ...base, terminal: false, ball, signals }
