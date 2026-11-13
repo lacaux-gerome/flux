@@ -114,6 +114,18 @@ describe('filtrage de l’inbox Linear', () => {
   })
 })
 
+describe('tickets parents', () => {
+  it('repère un ticket découpé en sous-tickets, d’où qu’il vienne', () => {
+    const parent = issue({ identifier: 'APP-2', state: { name: 'In Progress', type: 'started' }, children: { nodes: [{ id: 'x' }] } })
+    const tickets = mergeTickets([parent, issue({ identifier: 'APP-3', children: { nodes: [] } }), issue()], [], [], NOW)
+    expect(tickets.map(ticket => [ticket.key, ticket.hasSubIssues])).toEqual([
+      ['APP-2', true],
+      ['APP-3', false],
+      ['WEB-3434', false],
+    ])
+  })
+})
+
 describe('tickets liés aux sujets', () => {
   afterEach(() => vi.unstubAllGlobals())
 

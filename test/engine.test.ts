@@ -453,6 +453,18 @@ describe('rapprochement sujets / signaux', () => {
     ])
   })
 
+  it('range un ticket parent hors de Flux, même en cours, sauf si on me demande quelque chose', () => {
+    const parent = (overrides: Partial<Ticket> = {}) =>
+      itemFromTicket(ticket({ stateName: 'In Progress', stateType: 'started', hasSubIssues: true, ...overrides }), context)
+    expect(parent()).toMatchObject({ ball: 'parked', signals: [] })
+    expect(parent({ stateName: 'To frame', stateType: 'unstarted' }).ball).toBe('parked')
+    const mention = { id: 'p', kind: 'mention' as const, author: 'camille.martin', excerpt: 'on découpe comment ?', text: 'on découpe comment ?', at: '2026-11-05T17:25:00Z', url: 'https://linear.test/p' }
+    expect(parent({ notices: [mention] }).ball).toBe('me')
+    const asked = { id: 'q', excerpt: 'Tu valides le séquencement ?', text: 'Tu valides le séquencement ?', at: '2026-11-05T10:00:00Z', url: 'https://linear.test/q' }
+    expect(parent({ asked }).ball).toBe('others')
+    expect(itemFromTicket(ticket({ stateName: 'In Progress', stateType: 'started' }), context).ball).toBe('me')
+  })
+
   it('ne crée pas de sujet pour ce qui attend les autres', () => {
     const item = itemFromPullRequest(pr({ author: 'sam-lee' }), context)
     expect(reconcile([], [item], [], NOW).created).toEqual([])

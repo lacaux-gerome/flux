@@ -78,6 +78,8 @@ export interface Ticket {
   asked?: AskedComment
   // Jira: the status is one you are working in, whatever its name
   inProgress?: boolean
+  // Linear: split into sub-tickets, which carry the work
+  hasSubIssues?: boolean
 }
 
 export interface RankContext {
@@ -313,7 +315,8 @@ export function itemFromTicket(ticket: Ticket, ctx: RankContext): Item {
     signals.push(signal(ref, `${suffix}:${notice.id}`, 3, `${who} : ${notice.excerpt}`, 'question', notice.at))
   }
 
-  if (ticket.assignedToMe) {
+  // A parent ticket follows its sub-tickets: its own state asks nothing of me
+  if (ticket.assignedToMe && !ticket.hasSubIssues) {
     if (QUESTION_STATES.has(ticket.stateName)) {
       const action = ticket.stateName === 'To frame' ? 'cadrage' : 'question'
       signals.push(signal(ref, 'state-question', 3, ticket.stateName, action, ticket.updatedAt))
@@ -325,10 +328,10 @@ export function itemFromTicket(ticket: Ticket, ctx: RankContext): Item {
     }
   }
 
-  // A backlog is parked work, neither waiting on anyone nor to pick up: only a request brings it back,
-  // mine to someone else included
+  // A backlog is parked work, neither waiting on anyone nor to pick up, and so is a parent ticket:
+  // only a request brings it back, mine to someone else included
   const asked = ticket.asked && ticket.asked.awaitsReply !== false ? ticket.asked : undefined
-  const parked = ticket.stateType === 'backlog'
+  const parked = ticket.stateType === 'backlog' || ticket.hasSubIssues === true
   const stale = ageDays(ticket.updatedAt, ctx.now) > DORMANT_DAYS
   const ball = signals.length > 0 ? 'me' : asked ? 'others' : parked ? 'parked' : stale ? 'dormant' : 'others'
   const line = asked ? { asked: { excerpt: asked.excerpt, at: asked.at, url: asked.url } } : {}

@@ -16,6 +16,7 @@ const ISSUE_FIELDS = `
   state { name type }
   assignee { isMe }
   labels { nodes { name } }
+  children(first: 1) { nodes { id } }
 `
 
 interface RawIssue {
@@ -26,6 +27,7 @@ interface RawIssue {
   state: { name: string; type: string }
   assignee: { isMe: boolean } | null
   labels: { nodes: Array<{ name: string }> }
+  children?: { nodes: Array<{ id: string }> }
 }
 
 interface RawComment {
@@ -61,6 +63,7 @@ function ticketFromIssue(issue: RawIssue): Ticket {
     updatedAt: issue.updatedAt,
     labels: issue.labels.nodes.map(label => label.name),
     notices: [],
+    hasSubIssues: (issue.children?.nodes.length ?? 0) > 0,
   }
 }
 

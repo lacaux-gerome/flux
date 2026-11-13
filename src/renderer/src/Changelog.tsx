@@ -4,6 +4,7 @@ import { Spot } from './Spot'
 
 // Newest first, one line each: the id of the first entry marks what was read
 const ENTRIES: Array<{ id: string; date: string; text: string; scene?: string }> = [
+  { id: '2026-11-13-parents', date: '13 nov.', text: 'Les tickets parents sortent de Flux, sauf si on te demande quelque chose dessus' },
   {
     id: '2026-11-13-sessions',
     date: '13 nov.',
