@@ -4721,11 +4721,41 @@ button.ref-pill:hover {
   letter-spacing: 0.02em;
 }
 
-
+/* .tabs.sliding: the chosen tab's pill is drawn once, behind the buttons, and slides from one to the other */
+.tabs.sliding {
+  position: relative;
 }
 
+.tabs.sliding button {
+  z-index: 1;
+  transition:
+    color 0.22s var(--ease),
+    transform 0.16s var(--ease);
 }
 
+.tabs.sliding button:active {
+  transform: scale(0.94);
+}
+
+.tabs.sliding button[aria-current='page'] {
+  background: none;
+  box-shadow: none;
+}
+
+.tabs-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 999px;
+  background: var(--solid);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.tabs-thumb.animate {
+  transition:
+    transform 0.42s cubic-bezier(0.34, 1.36, 0.64, 1),
+    width 0.42s cubic-bezier(0.34, 1.36, 0.64, 1);
 }
 
 .settings .settings-hint {
