@@ -366,7 +366,15 @@ describe('tickets', () => {
     expect(ball({ stateName: 'Backlog', notices: [{ ...mention, kind: 'comment', waitingOnMe: false }] })).toBe('parked')
     expect(ball({ stateName: 'Backlog', notices: [mention] })).toBe('me')
     expect(ball({ stateName: 'To frame' })).toBe('me')
-    expect(ball({ stateName: 'Todo Weekly', stateType: 'unstarted' })).toBe('others')
+    expect(ball({ stateName: 'Todo Weekly', stateType: 'unstarted', assignedToMe: false })).toBe('others')
+  })
+
+  it('garde dans ma file un ticket à faire qui m’est assigné, après ceux en cours', () => {
+    const todo = itemFromTicket(ticket({ stateName: 'Todo Weekly', stateType: 'unstarted' }), context)
+    expect(todo.ball).toBe('me')
+    expect(todo.signals[0]).toMatchObject({ rank: 6, weight: 1, detail: 'Todo Weekly' })
+    const started = itemFromTicket(ticket({ stateName: 'In Progress', stateType: 'started' }), context)
+    expect(started.signals[0].weight).toBeLessThan(todo.signals[0].weight)
   })
 
   it('garde en attente un ticket où ma question attend une réponse, backlog compris', () => {

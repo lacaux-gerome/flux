@@ -325,6 +325,10 @@ export function itemFromTicket(ticket: Ticket, ctx: RankContext): Item {
     } else if (OWN_STATES.has(ticket.stateName) || ticket.inProgress) {
       const action = ticket.labels.some(label => BUG_LABELS.test(label)) ? 'diagnostic' : 'ticket'
       signals.push(signal(ref, 'state-own', 6, ticket.stateName, action, ticket.updatedAt))
+    } else if (ticket.stateType === 'unstarted') {
+      // Assigned and not started yet: still mine, after what is already under way
+      const action = ticket.labels.some(label => BUG_LABELS.test(label)) ? 'diagnostic' : 'ticket'
+      signals.push(signal(ref, 'state-todo', 6, ticket.stateName, action, ticket.updatedAt, ticket.updatedAt, 1))
     }
   }
 
