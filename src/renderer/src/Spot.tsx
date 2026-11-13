@@ -4,13 +4,17 @@ import {
   Check,
   ChevronsLeftRight,
   Hand,
+  Hourglass,
+  MessagesSquare,
   Pause,
   Play,
   Plus,
   RefreshCw,
   Settings as Gear,
   Sparkles,
+  UserRound,
   Waves,
+  type LucideIcon,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { RANKS } from '../../shared/ranks'
@@ -201,10 +205,15 @@ const railLeft = (index: number) => 38 + index * 194
 
 interface Topic {
   ref: string
-  rank: Rank
+  // No rank: a card in Attente
+  rank: Rank | null
   age: string
   title?: string
   busy?: boolean
+  // The ticket's board column
+  column?: string
+  // A PR no topic holds yet: its link icon in front of the ref
+  loose?: boolean
 }
 
 function TopicCard({
@@ -226,7 +235,9 @@ function TopicCard({
       style={{ ...tint(rankStyle(topic.rank)), ...style }}
     >
       <span className="w-topic-head">
+        {topic.loose && <BrandIcon brand="github" size={11} />}
         <b>{topic.ref}</b>
+        {topic.column && <span className="w-pill">{topic.column}</span>}
         {children}
         <span className="w-topic-age">{topic.age}</span>
       </span>
@@ -242,31 +253,52 @@ function TopicCard({
   )
 }
 
-function TopicHero({ topic, position }: { topic: Topic; position: string }) {
-  const Icon = rankStyle(topic.rank).icon
+const SESSION_ACTIONS = (
+  <>
+    <span className="w-button solid">
+      <BrandIcon brand="claude" size={14} />
+      Ouvrir dans Claude
+      <ArrowUpRight size={14} />
+    </span>
+    <span className="w-button">
+      <BrandIcon brand="linear" size={13} />
+      Voir le ticket
+    </span>
+  </>
+)
+
+function TopicHero({
+  topic,
+  meta,
+  signal,
+  actions = SESSION_ACTIONS,
+  className = '',
+}: {
+  topic: Topic
+  meta: string[]
+  signal?: string
+  actions?: ReactNode
+  className?: string
+}) {
+  const rank = topic.rank ?? 6
+  const Icon = rankStyle(rank).icon
   return (
-    <div className="w-focus-hero">
+    <div className={`w-focus-hero ${className}`}>
       <span className="w-hero-rank">
         <span className="w-tile">
           <Icon size={13} strokeWidth={2.2} />
         </span>
-        {RANKS[topic.rank].label}
+        {RANKS[rank].label}
       </span>
       <h3 className="w-focus-title">{topic.title}</h3>
       <span className="w-focus-meta">
-        <span>{topic.ref}</span>
-        <span>{position}</span>
+        {meta.map(entry => (
+          <span key={entry}>{entry}</span>
+        ))}
       </span>
+      {signal && <span className="w-signal">{signal}</span>}
       <span className="w-focus-actions">
-        <span className="w-button solid">
-          <BrandIcon brand="claude" size={14} />
-          Ouvrir dans Claude
-          <ArrowUpRight size={14} />
-        </span>
-        <span className="w-button">
-          <BrandIcon brand="linear" size={13} />
-          Voir le ticket
-        </span>
+        {actions}
         <span className="w-button round">
           <Hand size={14} />
         </span>
@@ -278,8 +310,47 @@ function TopicHero({ topic, position }: { topic: Topic; position: string }) {
   )
 }
 
+// A PR or ticket no topic holds: what it is, and one way out, to GitHub
+function LooseHero({ topic, meta }: { topic: Topic; meta: string[] }) {
+  return (
+    <div className="w-focus-hero raised">
+      <span className="w-hero-rank">
+        <span className="w-tile">
+          <Hourglass size={13} strokeWidth={2.2} />
+        </span>
+        En attente des autres
+      </span>
+      <h3 className="w-focus-title">{topic.title}</h3>
+      <span className="w-focus-meta">
+        {meta.map(entry => (
+          <span key={entry}>{entry}</span>
+        ))}
+      </span>
+      <span className="w-focus-actions">
+        <span className="w-button solid">
+          <BrandIcon brand="github" size={14} />
+          Ouvrir sur GitHub
+          <ArrowUpRight size={14} />
+        </span>
+      </span>
+    </div>
+  )
+}
+
+// A group of the rail: its label above its cards
+function RailGroup({ label, left, rank, icon }: { label: string; left: number; rank?: Rank; icon?: LucideIcon }) {
+  const style = rank === undefined ? undefined : rankStyle(rank)
+  const Icon = icon ?? style?.icon
+  return (
+    <span className="w-group" style={{ ...(style ? tint(style) : {}), left: left + 3, top: RAIL_TOP - 23 }}>
+      {Icon && <Icon size={11} strokeWidth={2.4} />}
+      {label}
+    </span>
+  )
+}
+
 function LinkRow({ kind, title, detail, className = '', style }: {
-  kind: 'conversation' | 'ticket'
+  kind: 'conversation' | 'ticket' | 'pr'
   title: string
   detail: ReactNode
   className?: string
@@ -288,7 +359,7 @@ function LinkRow({ kind, title, detail, className = '', style }: {
   return (
     <span className={`w-row-link ${className}`} style={style}>
       <span className={`w-kind ${kind}`}>
-        <BrandIcon brand={kind === 'conversation' ? 'claude' : 'linear'} size={13} />
+        <BrandIcon brand={kind === 'conversation' ? 'claude' : kind === 'pr' ? 'github' : 'linear'} size={13} />
       </span>
       <span className="w-row-text">
         <b>{title}</b>
@@ -300,14 +371,11 @@ function LinkRow({ kind, title, detail, className = '', style }: {
 }
 
 // The panel on the right: the topic's links, then its note
-function TopicLinks({ conversation }: { conversation?: ReactNode }) {
+function TopicLinks({ children, className = '', style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
-    <div className="w-inspector">
+    <div className={`w-inspector ${className}`} style={style}>
       <span className="w-inspector-label">Liens</span>
-      <span className="w-rows">
-        {conversation}
-        <LinkRow kind="ticket" title="OFF-1048" detail="Impossible d’enregistrer le fichier" />
-      </span>
+      <span className="w-rows">{children}</span>
       <span className="w-inspector-label">Note</span>
       <i className="w-skel" />
       <i className="w-skel short" />
@@ -344,10 +412,10 @@ function Tag({ children, side, until }: { children: ReactNode; side: 'left' | 'r
   )
 }
 
-function State({ label }: { label: string }) {
+function State({ label, status = 'idle' }: { label: string; status?: 'idle' | 'busy' }) {
   return (
     <span className="w-state-line">
-      <span className="w-state idle" />
+      <span className={`w-state ${status}`} />
       {label}
     </span>
   )
@@ -356,6 +424,7 @@ function State({ label }: { label: string }) {
 // The topic both windows show, and the conversation Flux now keeps in its links
 const SESSION_TOPIC: Topic = { ref: 'OFF-1048', rank: 6, age: '2 h', title: 'Corriger l’enregistrement du fichier' }
 const SESSION_TITLE = 'Diagnostic de l’enregistrement'
+const SESSION_TICKET = <LinkRow kind="ticket" title="OFF-1048" detail="Impossible d’enregistrer le fichier" />
 
 // En cours as it is now, the liveliest first: at work, waiting for you, paused in Claude
 const AFTER_RAIL: Topic[] = [
@@ -375,14 +444,14 @@ const UNZOOM = 14.6
 const RAIL_LOOK = 16.9
 const APART = 19.8
 // A touch smaller than the usual whole view, so the captions stay clear of the rail
-const SESSIONS_VIEW: View = [0.78, 480, 345]
+const WINDOW_VIEW: View = [0.78, 480, 345]
 
 function SessionsPicture() {
   const before = (
     <Chrome specs={tabs({ 'En cours': { on: [0, 99], count: [1, 0, LEAVES] } })}>
       <div className="w-layer w-out" style={d(LEAVES + 0.3)}>
-        <TopicHero topic={SESSION_TOPIC} position="1 sur 1" />
-        <TopicLinks />
+        <TopicHero topic={SESSION_TOPIC} meta={[SESSION_TOPIC.ref, '1 sur 1']} />
+        <TopicLinks>{SESSION_TICKET}</TopicLinks>
       </div>
       <TopicCard topic={SESSION_TOPIC} selected className="w-drop" style={d(LEAVES, pos(railLeft(0), RAIL_TOP))}>
         <Bot size={12} className="w-out" style={d(HANDS_BACK)} />
@@ -398,18 +467,17 @@ function SessionsPicture() {
   const after = (
     <Chrome specs={tabs({ 'En cours': { on: [0, 99], count: AFTER_RAIL.length } })}>
       <div className="w-layer">
-        <TopicHero topic={SESSION_TOPIC} position="2 sur 4" />
-        <TopicLinks
-          conversation={
-            <LinkRow
-              kind="conversation"
-              title={SESSION_TITLE}
-              detail={<State label="T’attend" />}
-              className="w-press"
-              style={d(CLICK)}
-            />
-          }
-        />
+        <TopicHero topic={SESSION_TOPIC} meta={[SESSION_TOPIC.ref, '2 sur 4']} />
+        <TopicLinks>
+          <LinkRow
+            kind="conversation"
+            title={SESSION_TITLE}
+            detail={<State label="T’attend" />}
+            className="w-press"
+            style={d(CLICK)}
+          />
+          {SESSION_TICKET}
+        </TopicLinks>
       </div>
       {AFTER_RAIL.map((topic, index) => (
         <TopicCard
@@ -428,6 +496,104 @@ function SessionsPicture() {
     </Chrome>
   )
   return <Compare before={before} after={after} apart={APART} />
+}
+
+// An end-to-end PR with no ticket: alone in Attente before, a topic of Mes sujets now
+const E2E_TITLE = 'Bloquer master sur la suite e2e'
+const E2E: Topic = { ref: 'daca#1617', rank: 6, age: '2 h', title: E2E_TITLE }
+const E2E_ROW = <LinkRow kind="pr" title={E2E.ref} detail={E2E_TITLE} />
+
+// Attente as it was: my work, the PR alone among it, then what I took part in
+const LOOSE_LEFT = railLeft(1)
+const CONTRIBUTIONS_LEFT = railLeft(2) + 52
+// File as it is now: what came back on my PRs, then my topics, the PR among them
+const MINE_LEFT = railLeft(1) + 12
+const MINE_RAIL: Topic[] = [
+  { ref: 'OFF-989', rank: 6, age: '4 j', column: 'In Progress' },
+  E2E,
+  { ref: 'OFF-1070', rank: 6, age: '1 j', column: 'Todo Weekly' },
+]
+const mineLeft = (index: number) => MINE_LEFT + index * 194
+
+const PR = {
+  HERO: 4.4,
+  WIPE: 7.4,
+  ZOOM: 10.8,
+  CLICK: 13.4,
+  UNZOOM: 14.6,
+  RAIL: 16.8,
+  APART: 19.6,
+}
+// On « Remettre la PR au clair », the first action of the topic
+const PR_BUTTON: [number, number] = [148, 439]
+
+function PrPicture() {
+  const before = (
+    <Chrome specs={tabs({ File: { count: 3 }, Attente: { on: [0, 99], count: 3 } })}>
+      <div className="w-layer">
+        <LooseHero topic={E2E} meta={[E2E.ref, 'Pull request', 'ci/e2e-gate']} />
+      </div>
+      <RailGroup label="Mon travail · 2" left={railLeft(0)} icon={UserRound} />
+      <TopicCard topic={{ ref: 'api#14428', rank: null, age: '3 j' }} style={pos(railLeft(0), RAIL_TOP)} />
+      <TopicCard topic={{ ...E2E, rank: null, loose: true }} selected style={pos(LOOSE_LEFT, RAIL_TOP)} />
+      <i className="w-divider" style={pos(CONTRIBUTIONS_LEFT - 26, RAIL_TOP - 22)} />
+      <RailGroup label="Mes contributions · 1" left={CONTRIBUTIONS_LEFT} icon={MessagesSquare} />
+      <TopicCard topic={{ ref: 'aura#251', rank: null, age: '1 j' }} style={pos(CONTRIBUTIONS_LEFT, RAIL_TOP)} />
+      <Tag side="left" until={PR.APART}>
+        Avant
+      </Tag>
+    </Chrome>
+  )
+  const actions = (
+    <>
+      <span className="w-button solid w-press" style={d(PR.CLICK)}>
+        <BrandIcon brand="claude" size={14} />
+        Remettre la PR au clair
+        <ArrowUpRight size={14} />
+      </span>
+      <span className="w-button">
+        <BrandIcon brand="claude" size={13} />
+        Lancer un thread
+      </span>
+    </>
+  )
+  const after = (
+    <Chrome specs={tabs({ File: { on: [0, 99], count: 4 }, Attente: { count: 2 } })}>
+      <div className="w-layer">
+        <TopicHero
+          topic={E2E}
+          meta={[E2E.ref, '2 h d’attente', '3 sur 4']}
+          signal="PR ouverte"
+          actions={actions}
+          className="raised"
+        />
+        <TopicLinks className="w-out" style={d(PR.CLICK + 0.3)}>
+          {E2E_ROW}
+        </TopicLinks>
+        <TopicLinks className="w-in" style={d(PR.CLICK + 0.3)}>
+          <LinkRow kind="conversation" title="Faire avancer la PR e2e" detail={<State label="Au travail" status="busy" />} />
+          {E2E_ROW}
+        </TopicLinks>
+      </div>
+      <RailGroup label={RANKS[1].label} left={railLeft(0)} rank={1} />
+      <TopicCard topic={{ ref: 'daca#1516', rank: 1, age: '16 j' }} style={pos(railLeft(0), RAIL_TOP)} />
+      <RailGroup label={RANKS[6].label} left={MINE_LEFT} rank={6} />
+      {MINE_RAIL.map((topic, index) => (
+        <TopicCard
+          key={topic.ref}
+          topic={topic}
+          selected={topic === E2E}
+          style={pos(mineLeft(index), RAIL_TOP)}
+        >
+          {topic === E2E && <Bot size={12} className="w-in" style={d(PR.CLICK + 0.5)} />}
+        </TopicCard>
+      ))}
+      <Tag side="right" until={PR.APART}>
+        Maintenant
+      </Tag>
+    </Chrome>
+  )
+  return <Compare before={before} after={after} apart={PR.APART} />
 }
 
 /* Scenes */
@@ -452,6 +618,59 @@ interface Scene {
 
 export const SCENES: Scene[] = [
   {
+    id: 'prs',
+    rank: 6,
+    ms: 24500,
+    kicker: 'PR sans ticket',
+    headline: 'Tes PR sans ticket vont jusqu’au bout.',
+    headlineUntil: 1.6,
+    captions: [
+      [1.8, 'Avant : ta PR e2e n’a pas de ticket en face.'],
+      [PR.HERO, 'Elle attend dans Attente, seule : ni note, ni liens, ni Claude.'],
+      [PR.WIPE, 'Maintenant, elle a son sujet dans Mes sujets.'],
+      [PR.ZOOM, 'PR ouverte : elle compte comme un ticket en cours.'],
+      [PR.CLICK - 0.4, 'Un clic, et Claude la fait avancer.'],
+      [PR.RAIL, 'Elle reste dans ta file jusqu’au merge.'],
+      [PR.APART, 'Avant : seule dans Attente. Maintenant : menée jusqu’au merge.'],
+    ],
+    cam: [
+      cam(1.2, GLOBAL),
+      cam(1.9, WINDOW_VIEW),
+      cam(PR.ZOOM, WINDOW_VIEW),
+      [PR.ZOOM + 0.7, 1.5, 340, 380],
+      [PR.UNZOOM, 1.5, 340, 380],
+      cam(PR.UNZOOM + 0.7, WINDOW_VIEW),
+      cam(PR.APART, WINDOW_VIEW),
+      [PR.APART + 0.8, 1, 480, 290],
+    ],
+    cursor: [
+      [0, 420, 540, 0],
+      [PR.ZOOM + 0.6, 420, 540, 0],
+      [PR.ZOOM + 0.9, 420, 540],
+      [PR.CLICK - 0.6, ...PR_BUTTON],
+      [PR.CLICK + 0.4, ...PR_BUTTON],
+      [PR.UNZOOM + 0.2, 300, 560],
+      [PR.UNZOOM + 0.6, 300, 560, 0],
+    ],
+    clicks: [[PR.CLICK, ...PR_BUTTON]],
+    focus: [
+      [2, PR.HERO - 0.2, LOOSE_LEFT - 10, 488, 204, 100, 26],
+      [PR.HERO + 0.2, PR.WIPE - 0.3, 28, 293, 564, 178, 26],
+      [PR.WIPE + 1.6, PR.ZOOM - 0.1, MINE_LEFT - 10, 466, 592, 122, 26],
+      [PR.ZOOM + 0.8, PR.CLICK - 0.8, 30, 377, 98, 33, 10],
+      [PR.UNZOOM + 0.7, PR.RAIL - 0.2, 636, 302, 296, 56, 14],
+      [PR.RAIL, PR.APART - 0.4, mineLeft(1) - 10, 488, 204, 100, 26],
+    ],
+    split: [
+      [0, 960, 0],
+      [PR.WIPE - 0.1, 960, 0],
+      [PR.WIPE, 960],
+      [PR.WIPE + 1.4, 0],
+      [PR.WIPE + 1.5, 0, 0],
+    ],
+    Picture: PrPicture,
+  },
+  {
     id: 'sessions',
     rank: 0,
     ms: 25000,
@@ -470,12 +689,12 @@ export const SCENES: Scene[] = [
     ],
     cam: [
       cam(1.2, GLOBAL),
-      cam(1.9, SESSIONS_VIEW),
-      cam(ZOOM, SESSIONS_VIEW),
+      cam(1.9, WINDOW_VIEW),
+      cam(ZOOM, WINDOW_VIEW),
       [ZOOM + 0.7, 1.5, 600, 350],
       [UNZOOM, 1.5, 600, 350],
-      cam(UNZOOM + 0.7, SESSIONS_VIEW),
-      cam(APART, SESSIONS_VIEW),
+      cam(UNZOOM + 0.7, WINDOW_VIEW),
+      cam(APART, WINDOW_VIEW),
       [APART + 0.8, 1, 480, 290],
     ],
     cursor: [

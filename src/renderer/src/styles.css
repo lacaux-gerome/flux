@@ -2328,6 +2328,62 @@ button.ref-pill:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* The hero raised a little, over a rail whose groups carry a label */
+.w-focus-hero.raised {
+  bottom: 142px;
+}
+
+.w-signal {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.w-group {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.w-group svg {
+  color: var(--tint-light, currentColor);
+}
+
+.w-divider {
+  position: absolute;
+  width: 1px;
+  height: 112px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.4) 25%, rgba(255, 255, 255, 0.4) 85%, transparent);
+}
+
+/* The board column on a card, first to give way */
+.w-pill {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--hairline);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.w-kind.pr {
+  background: linear-gradient(135deg, #64aaff, #1e5ac8);
+}
+
+.w-state.busy {
+  background: var(--ok);
+}
+
 /* The card leaving the rail when Claude hands back, in the before window */
 .w-drop {
   animation: w-drop 0.3s var(--ease-in) var(--d) forwards;
@@ -2351,6 +2407,10 @@ button.ref-pill:hover {
 }
 
 /* A row pressed by the cursor: it gives a little, and lights up for a beat */
+.w-button.w-press {
+  position: relative;
+}
+
 .w-press {
   animation: w-press 0.3s var(--ease) var(--d) backwards;
 }
