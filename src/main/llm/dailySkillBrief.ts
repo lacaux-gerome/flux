@@ -9,7 +9,7 @@ import { DAILY_COMMAND, DAILY_SKILL_DIR } from '../paths'
 import { newSessionUrl, openInDesktop } from '../threads/desktop'
 import { DAILY_CONTRACT } from './daily'
 
-// The active profile's config, written the way you would type it
+// The config file, written the way you would type it
 const CONFIG_FILE = CONFIG_PATH.replace(homedir(), '~')
 
 // Writes the generic skill where Flux looks for it, and never over one already there

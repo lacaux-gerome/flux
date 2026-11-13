@@ -20,7 +20,6 @@ import {
 import type { McpDraft } from '../shared/claude'
 import { nextWrapup, type JobDraft } from '../shared/jobs'
 import { FLUX_SCHEME, fluxLink, linkMenuEntries, parseFluxLink, type LinkMenu } from '../shared/links'
-import { PROFILE_LABEL, type ProfilesPatch } from '../shared/profiles'
 import type { AppState, ProjectOptions, ProposedAction, SettingsPatch, Topic } from '../shared/types'
 import { McpManager } from './claude/mcp'
 import { SkillLibrary } from './claude/skills'
@@ -37,7 +36,6 @@ import { createDailySkill, useDailyTemplate } from './llm/dailySkillBrief'
 import { Triage } from './llm/triage'
 import { notificationAccess, requestNotificationAccess } from './notificationAccess'
 import { checkCalendarUrl, checkFigma, checkGithub, checkJira, checkLinearKey, normalizeJiraSite } from './onboarding'
-import { ACTIVE_PROFILE, profiles, saveProfiles } from './profile'
 import {
   ARCHIVE_DIR,
   BIN,
@@ -223,20 +221,10 @@ function trayLabel(state: AppState): string {
   return `▶ ${state.queue.length}  ${short}`
 }
 
-// The other profile, once Perso is on: picking it relaunches Flux there
-function profileItems(): MenuItemConstructorOptions[] {
-  if (!profiles().perso) return []
-  const other = ACTIVE_PROFILE === 'pro' ? 'perso' : 'pro'
-  return [
-    { type: 'separator' },
-    { label: `Passer à ${PROFILE_LABEL[other]}`, click: () => setProfiles({ active: other }) },
-  ]
-}
-
 function buildTray(): void {
   tray = new Tray(nativeImage.createEmpty())
   tray.setTitle('Flux')
-  tray.setToolTip(profiles().perso ? `Flux · ${PROFILE_LABEL[ACTIVE_PROFILE]}` : 'Flux')
+  tray.setToolTip('Flux')
   tray.on('click', () => {
     const head = flux.current()?.queue[0]
     if (head) showTopic(head.topic.id)
@@ -249,7 +237,6 @@ function buildTray(): void {
         { label: 'Wrap-up', click: () => showWrapup() },
         { label: 'Nouvelle note', click: () => openCapture() },
         { label: 'Rafraîchir', click: () => void flux.refresh() },
-        ...profileItems(),
         { type: 'separator' },
         { label: 'Quitter', role: 'quit' },
       ]),
@@ -333,13 +320,6 @@ async function listProjects(): Promise<ProjectOptions> {
   }
 }
 
-// Config, paths and caches all hang on the profile read at launch: a switch starts Flux afresh on the other one
-function setProfiles(patch: ProfilesPatch): void {
-  if (!saveProfiles(patch)) return
-  app.relaunch()
-  app.quit()
-}
-
 const pulls = new PullBoard(fetchMyPulls, noReviewRepos)
 
 function registerIpc(): void {
@@ -418,8 +398,6 @@ function registerIpc(): void {
     // The panel closes as soon as settings are written; sources reload in the background
     void flux.reloadSources()
   })
-  ipcMain.handle('flux:profiles', () => profiles())
-  ipcMain.handle('flux:set-profiles', (_event, patch: ProfilesPatch) => setProfiles(patch))
   ipcMain.handle('flux:test-notification', () => {
     notify('Flux', 'Les notifications arrivent bien.', () => openMain())
   })

@@ -7,20 +7,17 @@ import {
   LoaderCircle,
   Settings2,
   SquareKanban,
-  UserRound,
   Waves,
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
 import { CALENDARS, calendarInfo, type CalendarName } from '../../shared/calendars'
-import { PROFILE_LABEL, type ProfileId, type Profiles } from '../../shared/profiles'
 import { figmaTeamIds } from '../../shared/figma'
 import { isTracker, projectTrackers, TRACKERS, type TrackerName } from '../../shared/trackers'
 import type { CheckResult, NotificationAccess, Rank, Settings, TrackedProject } from '../../shared/types'
 
 import { BrandIcon, type Brand } from './Brand'
-import { PROFILE_ICON } from './Profiles'
 import { ProjectsPicker } from './Projects'
 import { rankStyle, tint, type RankStyle } from './rankStyle'
 import { TrackerBadge, TRACKER_HINT, trackerInfo } from './Trackers'
@@ -28,7 +25,6 @@ import { TrackerBadge, TRACKER_HINT, trackerInfo } from './Trackers'
 type SecretKey = 'linearKey' | 'calendarUrl'
 type StepKey =
   | 'welcome'
-  | 'profiles'
   | 'github'
   | 'tools'
   | 'jira'
@@ -62,14 +58,6 @@ const ALL_STEPS: Record<StepKey, Omit<Step, 'eyebrow'> & { eyebrow?: string }> =
     eyebrow: 'Bienvenue',
     title: 'Flux tire ton travail vers toi.',
     text: 'Quelques connexions et ta file se remplit seule : les PR depuis GitHub, les tickets depuis ton outil de gestion de projet, les réunions depuis ton agenda. Tout reste sur ce Mac.',
-  },
-  profiles: {
-    key: 'profiles',
-    rank: 6,
-    icon: UserRound,
-    eyebrow: 'Profils',
-    title: 'Un Flux ou deux ?',
-    text: 'Pro et Perso vivent à part : chacun ses comptes, ses clefs, ses espaces et sa file. Un bouton à côté du logo passe de l’un à l’autre.',
   },
   github: {
     key: 'github',
@@ -153,21 +141,9 @@ const ALL_STEPS: Record<StepKey, Omit<Step, 'eyebrow'> & { eyebrow?: string }> =
   },
 }
 
-// Perso starts from its own welcome, without the choice of profiles Pro already made
-const PERSO_WELCOME = {
-  title: 'Ton Flux perso.',
-  text: 'Ce profil a ses propres comptes, clefs et espaces : rien de ton Flux pro n’y apparaît. Quelques connexions et sa file se remplit seule.',
-}
-
-const PROFILE_CHOICES: { perso: boolean; label: string; hint: string; icons: ProfileId[] }[] = [
-  { perso: false, label: 'Pro seulement', hint: 'Un seul Flux, pour le travail', icons: ['pro'] },
-  { perso: true, label: 'Pro et Perso', hint: 'Perso se règle juste après', icons: ['pro', 'perso'] },
-]
-
-function buildSteps(trackers: TrackerName[], profile: ProfileId, twoProfiles: boolean): Step[] {
+function buildSteps(trackers: TrackerName[]): Step[] {
   const keys: StepKey[] = [
     'welcome',
-    ...(profile === 'pro' ? (['profiles'] as const) : []),
     'github',
     'tools',
     ...(['jira', 'linear', 'figma'] as const).filter(name => trackers.includes(name)),
@@ -177,14 +153,12 @@ function buildSteps(trackers: TrackerName[], profile: ProfileId, twoProfiles: bo
     'done',
   ]
   const connections = keys.filter(key => CONNECTIONS.includes(key))
-  // With two profiles, every eyebrow says which one you are setting up
-  const prefix = twoProfiles ? `${PROFILE_LABEL[profile]} · ` : ''
   return keys.map(key => {
-    const step = { ...ALL_STEPS[key], ...(key === 'welcome' && profile === 'perso' ? PERSO_WELCOME : {}) }
+    const step = ALL_STEPS[key]
     const position = connections.indexOf(key)
     const eyebrow =
       step.eyebrow ?? `Connexion ${position + 1} sur ${connections.length}`
-    return { ...step, eyebrow: key === 'profiles' ? eyebrow : `${prefix}${eyebrow}` }
+    return { ...step, eyebrow }
   })
 }
 
@@ -269,11 +243,8 @@ export function Onboarding({ onTint, onDone }: { onTint(style: RankStyle): void;
   // null until you touch the picker, so an untouched step keeps config.json
   const [projects, setProjects] = useState<TrackedProject[] | null>(null)
   const [asking, setAsking] = useState(false)
-  const [profiles, setProfiles] = useState<Profiles | null>(null)
-  const [perso, setPerso] = useState(false)
   const input = useRef<HTMLInputElement>(null)
-  const profile = profiles?.active ?? 'pro'
-  const steps = useMemo(() => buildSteps(trackers, profile, perso), [trackers, profile, perso])
+  const steps = useMemo(() => buildSteps(trackers), [trackers])
   const step = steps[Math.min(index, steps.length - 1)]
   const style = rankStyle(step.rank)
 
@@ -284,10 +255,6 @@ export function Onboarding({ onTint, onDone }: { onTint(style: RankStyle): void;
       setCalendar(loaded.calendar)
       setJira({ site: loaded.jiraSite, email: loaded.jiraEmail, token: '' })
       setFigma({ teams: loaded.figmaTeams.join(', '), token: '' })
-    })
-    void window.flux.profiles().then(loaded => {
-      setProfiles(loaded)
-      setPerso(loaded.perso)
     })
   }, [])
 
@@ -328,14 +295,6 @@ export function Onboarding({ onTint, onDone }: { onTint(style: RankStyle): void;
     await window.flux.saveSettings({ onboarded: true })
     onDone()
   }
-
-  // Pro is ready: Flux relaunches on Perso, whose own welcome starts since it has never run
-  const setUpPerso = async () => {
-    await window.flux.saveSettings({ onboarded: true })
-    await window.flux.setProfiles({ active: 'perso' })
-  }
-  const persoToSetUp =
-    profile === 'pro' && perso && !profiles?.list.find(entry => entry.id === 'perso')?.onboarded
 
   const reload = async () => setSettings(await window.flux.getSettings())
 
@@ -393,10 +352,6 @@ export function Onboarding({ onTint, onDone }: { onTint(style: RankStyle): void;
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (step.key === 'done') return void finish()
-    if (step.key === 'profiles') {
-      void window.flux.setProfiles({ perso }).then(() => window.flux.profiles().then(setProfiles))
-      return next()
-    }
     if (step.key === 'notifications' && access === 'not-determined') return void askNotifications()
     if (step.key === 'projects') {
       if (projects !== null) void window.flux.saveSettings({ projects }).then(reload)
@@ -425,7 +380,6 @@ export function Onboarding({ onTint, onDone }: { onTint(style: RankStyle): void;
     )
 
   const Icon = step.icon
-  const PersoIcon = PROFILE_ICON.perso
   // The calendar step asks for its link only once a calendar is chosen, with that calendar's help
   const secret =
     step.key === 'calendar'
@@ -512,32 +466,6 @@ export function Onboarding({ onTint, onDone }: { onTint(style: RankStyle): void;
                 </button>
               )}
             </>
-          )}
-
-          {step.key === 'profiles' && (
-            <div className="onboarding-tools" role="group" aria-label="Profils">
-              {PROFILE_CHOICES.map(choice => (
-                <button
-                  type="button"
-                  key={choice.label}
-                  className="onboarding-tool"
-                  aria-pressed={perso === choice.perso}
-                  onClick={() => setPerso(choice.perso)}
-                >
-                  <span className="onboarding-profile-icons" aria-hidden="true">
-                    {choice.icons.map(id => {
-                      const ProfileIcon = PROFILE_ICON[id]
-                      return <ProfileIcon key={id} size={22} />
-                    })}
-                  </span>
-                  <strong>{choice.label}</strong>
-                  <small>{choice.hint}</small>
-                  {perso === choice.perso && (
-                    <Check size={15} aria-hidden="true" className="onboarding-tool-check" />
-                  )}
-                </button>
-              ))}
-            </div>
           )}
 
           {step.key === 'tools' && (
@@ -739,17 +667,6 @@ export function Onboarding({ onTint, onDone }: { onTint(style: RankStyle): void;
                 </li>
               ))}
             </ul>
-          )}
-
-          {step.key === 'done' && persoToSetUp && (
-            <button
-              type="button"
-              className="pill glass small onboarding-next-profile"
-              onClick={() => void setUpPerso()}
-            >
-              <PersoIcon size={15} aria-hidden="true" />
-              Régler Perso maintenant
-            </button>
           )}
         </div>
 

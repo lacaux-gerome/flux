@@ -95,7 +95,6 @@ const ENTRIES: Entry[] = [
     text: 'Les conversations Claude restent En cours et se rouvrent depuis les liens du sujet.',
     scene: 'sessions',
   },
-  { id: '2026-11-12-profiles', date: '12 nov.', name: 'Profils', text: 'Profils Pro et Perso, chacun avec ses réglages.' },
   {
     id: '2026-11-12-workspaces',
     date: '12 nov.',

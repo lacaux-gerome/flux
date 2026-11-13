@@ -1,7 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { CONFIG } from './config'
-import { PROFILE_DIR } from './profile'
 
 const HOME = homedir()
 
@@ -23,8 +22,7 @@ export const CLAUDE_PROJECTS_DIR = join(HOME, '.claude/projects')
 // Claude Desktop's record of each Code session: its own id, its conversation id, its title
 export const DESKTOP_SESSIONS_DIR = join(HOME, 'Library/Application Support/Claude/claude-code-sessions')
 
-// Each profile keeps its own state: ~/.flux for Pro, ~/.flux/profiles/perso for Perso
-export const STATE_DIR = PROFILE_DIR
+export const STATE_DIR = join(HOME, '.flux')
 export const SNAPSHOT_FILE = join(STATE_DIR, 'snapshot.json')
 export const NOTIFY_FILE = join(STATE_DIR, 'notify.json')
 export const SETTINGS_FILE = join(STATE_DIR, 'settings.json')
