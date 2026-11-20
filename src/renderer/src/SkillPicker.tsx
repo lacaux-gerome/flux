@@ -70,7 +70,7 @@ export function SkillPicker({
         value={value}
         spellCheck={false}
         autoComplete="off"
-        placeholder="gl_daily"
+        placeholder="Chercher un skill"
         aria-label="Skill"
         aria-autocomplete="list"
         aria-expanded={open}

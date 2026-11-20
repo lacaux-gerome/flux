@@ -3,6 +3,8 @@
 // limit MCP servers per task, so Flux runs them through the claude CLI. Each run is a Claude session
 // that reopens in Desktop.
 
+import { serviceOf } from './skillGraph'
+
 export type JobRepeat = 'manual' | 'hourly' | 'daily'
 
 // Auto lets the classifier decide; strict refuses anything your settings do not already allow
@@ -67,6 +69,8 @@ export interface McpServer {
 export interface SkillOption {
   name: string
   description: string
+  // The services it reaches through MCP, read from its text: Linear, Sentry…
+  services: string[]
 }
 
 // Flux's own daily, which runs the daily command each workday morning on its own schedule, apart
@@ -200,6 +204,23 @@ export function matchSkills(skills: SkillOption[], query: string): SkillOption[]
   const byName = skills.filter(skill => skill.name.toLowerCase().includes(needle))
   const byText = skills.filter(skill => !byName.includes(skill) && skill.description.toLowerCase().includes(needle))
   return [...byName, ...byText]
+}
+
+// A server of its own first, then a claude.ai connector, then one that comes with another plugin
+function directness(server: string): number {
+  const plugin = server.match(/^plugin:([^:]+):(.+)$/)
+  if (plugin) return plugin[1] === plugin[2] ? 0 : 2
+  return server.startsWith('claude.ai ') ? 1 : 0
+}
+
+// The servers that give a skill the services it names: one each, a connected one first
+export function serversFor(services: string[], servers: McpServer[]): string[] {
+  return services.flatMap(service => {
+    const [best] = servers
+      .filter(server => serviceOf(server.name) === service)
+      .sort((a, b) => Number(b.status === 'ok') - Number(a.status === 'ok') || directness(a.name) - directness(b.name))
+    return best ? [best.name] : []
+  })
 }
 
 // The claude flags of a run: its session id, its name, and the servers it may use or not. The

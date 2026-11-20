@@ -11,11 +11,13 @@ import {
   matchSkills,
   mcpLabel,
   nextRun,
+  serversFor,
   whenLabel,
   type Job,
   type JobDraft,
   type JobSchedule,
 } from '../src/shared/jobs'
+import { mcpServices } from '../src/shared/skillGraph'
 import { parseMcpInit, skillInfo } from '../src/main/jobs/catalog'
 import { JobScheduler, type JobDeps } from '../src/main/jobs/scheduler'
 
@@ -131,16 +133,42 @@ describe('lancement d’un job', () => {
 
   it('filtre les skills par leur nom d’abord, puis par ce qu’elles font', () => {
     const skills = [
-      { name: 'gl_daily', description: 'Daily en lecture seule.' },
-      { name: 'gl_commit', description: 'Crée des commits propres.' },
-      { name: 'commit-commands:commit', description: 'Create a git commit' },
-      { name: 'gl_jump_in', description: 'Génère un document jump-in à partir d’un cadrage.' },
+      { name: 'gl_daily', description: 'Daily en lecture seule.', services: [] },
+      { name: 'gl_commit', description: 'Crée des commits propres.', services: [] },
+      { name: 'commit-commands:commit', description: 'Create a git commit', services: [] },
+      { name: 'gl_jump_in', description: 'Génère un document jump-in à partir d’un cadrage.', services: [] },
     ]
     expect(matchSkills(skills, '')).toBe(skills)
     expect(matchSkills(skills, ' /COMMIT').map(skill => skill.name)).toEqual(['gl_commit', 'commit-commands:commit'])
     expect(matchSkills(skills, 'lecture').map(skill => skill.name)).toEqual(['gl_daily'])
     expect(matchSkills(skills, 'gl_').map(skill => skill.name)).toEqual(['gl_daily', 'gl_commit', 'gl_jump_in'])
     expect(matchSkills(skills, 'cadrage jump')).toEqual([])
+  })
+
+  it('coche pour une skill les MCP des services qu’elle cite, un par service, connecté d’abord', () => {
+    const text = [
+      '---',
+      'description: lit Notion',
+      '---',
+      '## Collecte',
+      'Lis les issues avec `mcp__plugin_linear_linear__list_issues`, puis les erreurs Sentry.',
+      '## Règles',
+      'Ne poste jamais dans Slack.',
+    ].join('\n')
+    expect(mcpServices(text)).toEqual(['Linear', 'Sentry'])
+    const servers = [
+      { name: 'claude.ai Linear', status: 'auth' as const },
+      { name: 'plugin:linear:linear', status: 'ok' as const },
+      { name: 'sentry', status: 'failed' as const },
+      { name: 'plugin:design-to-code:datadog', status: 'ok' as const },
+      { name: 'datadog', status: 'ok' as const },
+      { name: 'claude.ai Notion', status: 'ok' as const },
+    ]
+    expect(serversFor(['Linear', 'Sentry', 'Datadog', 'Slack'], servers)).toEqual([
+      'plugin:linear:linear',
+      'sentry',
+      'datadog',
+    ])
   })
 })
 

@@ -5812,6 +5812,44 @@ li.chosen .project-check {
   font-size: 13px;
 }
 
+.job-kept {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 0;
+  padding: 8px 8px 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-2);
+  font-size: 12.5px;
+  animation: job-kept-in 200ms var(--ease) both;
+}
+
+.job-kept button {
+  margin-left: auto;
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+
+.job-kept button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+@keyframes job-kept-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
 .job-delete {
   margin-right: auto;
 }

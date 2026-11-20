@@ -1,6 +1,8 @@
+import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 
 import type { McpServer, McpStatus, SkillOption } from '../../shared/jobs'
+import { mcpServices } from '../../shared/skillGraph'
 import { run } from '../exec'
 import { BIN } from '../paths'
 import { claudeEnv } from '../llm/claude'
@@ -43,7 +45,13 @@ export async function listMcpServers(cwd: string): Promise<McpServer[]> {
   return servers
 }
 
-// Yours first, then those of your plugins, each as /name would call it
+// Yours first, then those of your plugins, each as /name would call it, with the services it names
 export async function listSkills(home = homedir()): Promise<SkillOption[]> {
-  return (await scanSkills(home)).map(({ name, description }) => ({ name, description }))
+  return Promise.all(
+    (await scanSkills(home)).map(async ({ name, description, file }) => ({
+      name,
+      description,
+      services: mcpServices(await readFile(file, 'utf8').catch(() => '')),
+    })),
+  )
 }

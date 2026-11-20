@@ -175,7 +175,8 @@ function subHeadings(lines: string[]): Section[] {
   return parts
 }
 
-function serviceOf(name: string): string {
+// The service an MCP server or tool prefix stands for: plugin:linear:linear and claude.ai Linear are Linear
+export function serviceOf(name: string): string {
   const found = SERVICES.find(([pattern]) => pattern.test(name))
   if (found) return found[1]
   const bare = name.replace(/^plugin_[^_]+_/, '').replace(/^claude_ai_/, '')
@@ -259,6 +260,14 @@ function pointsOf(lines: string[]): string[] {
   const subs = subHeadings(lines)
   if (subs.length > 0) return subs.map(part => stepTitle(part.title))
   return numberedItems(lines).map(item => pointLabel(item.title))
+}
+
+// The services a skill reaches through MCP, as its page lists them: its rules only frame it, and
+// "never post in Slack" does not call Slack
+export function mcpServices(text: string): string[] {
+  return skillGraph(text)
+    .calls.filter(call => call.kind === 'mcp')
+    .map(call => call.label)
 }
 
 // The procedure, as the skill writes it. A section named Procédure or Étapes (or the only one that

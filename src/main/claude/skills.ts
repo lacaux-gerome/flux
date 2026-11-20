@@ -25,7 +25,7 @@ function clip(text: string): string {
 }
 
 // A skill's name and what it does: from its frontmatter, or else its first line
-export function skillInfo(text: string, fallback: string): SkillOption {
+export function skillInfo(text: string, fallback: string): Pick<SkillOption, 'name' | 'description'> {
   const front = text.match(/^---\n([\s\S]*?)\n---\n?/)
   const head = front?.[1] ?? ''
   const name = head.match(/^name:\s*(.+)$/m)?.[1].trim().replace(/^['"]|['"]$/g, '') || fallback

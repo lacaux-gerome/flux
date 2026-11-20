@@ -18,6 +18,7 @@ import {
   draftProblem,
   mcpLabel,
   parseTime,
+  serversFor,
   WEEK_ORDER,
   WEEKDAYS,
   whenLabel,
@@ -30,7 +31,9 @@ import {
   type McpServer,
 } from '../../shared/jobs'
 import type { DailySheet } from '../../shared/types'
+import { waitingFor } from './format'
 import { SkillPicker } from './SkillPicker'
+import { readMark, saveMark } from './storage'
 import { TimePicker } from './TimePicker'
 
 const DAY_LETTER = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
@@ -61,6 +64,36 @@ function blank(cwd: string): JobDraft {
     mcps: [],
     cwd,
     permission: 'auto',
+  }
+}
+
+function jobDraftOf(view: JobView): JobDraft {
+  const { id: _id, createdAt: _createdAt, ...draft } = view.job
+  return draft
+}
+
+interface EditorState {
+  form: JobDraft
+  mode: 'prompt' | 'skill'
+  skill: string
+}
+
+// What the form held when it was left, until the task is saved or the draft dropped
+interface KeptDraft extends EditorState {
+  auto: string[]
+  at: string
+}
+
+const draftKey = (id: string | null) => `flux.jobDraft.${id ?? 'new'}`
+
+function keptDraft(key: string): KeptDraft | null {
+  const raw = readMark(key)
+  if (!raw) return null
+  try {
+    const kept = JSON.parse(raw) as KeptDraft
+    return kept.form && typeof kept.at === 'string' ? kept : null
+  } catch {
+    return null
   }
 }
 
@@ -151,25 +184,64 @@ function JobEditor({
   onSaved(message: string): void
   onError(message: string): void
 }) {
-  const [form, setForm] = useState<JobDraft>(() => {
-    if (!view) return blank(board.defaultCwd)
-    const { id: _id, createdAt: _createdAt, ...draft } = view.job
-    return draft
+  const key = draftKey(view?.job.id ?? null)
+  const [start] = useState(() => {
+    const initial: EditorState = view
+      ? { form: jobDraftOf(view), mode: view.job.skill ? 'skill' : 'prompt', skill: view.job.skill ?? '' }
+      : { form: blank(board.defaultCwd), mode: 'prompt', skill: '' }
+    return { initial, kept: keptDraft(key) }
   })
-  const [mode, setMode] = useState<'prompt' | 'skill'>(view?.job.skill ? 'skill' : 'prompt')
-  const [skill, setSkill] = useState(view?.job.skill ?? '')
+  const [form, setForm] = useState<JobDraft>(start.kept?.form ?? start.initial.form)
+  const [mode, setMode] = useState<'prompt' | 'skill'>(start.kept?.mode ?? start.initial.mode)
+  const [skill, setSkill] = useState(start.kept?.skill ?? start.initial.skill)
+  // The servers ticked for the chosen skill, not by hand: another skill takes them back
+  const [auto, setAuto] = useState<string[]>(start.kept?.auto ?? [])
+  const [keptAt, setKeptAt] = useState(start.kept?.at ?? null)
   const [problem, setProblem] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const nameField = useRef<HTMLInputElement>(null)
   const now = new Date()
   const draft: JobDraft = { ...form, skill: mode === 'skill' ? skill : null }
+  const snapshot = JSON.stringify({ form, mode, skill })
+  const dirty = snapshot !== JSON.stringify(start.initial)
   const set = (patch: Partial<JobDraft>) => {
     setForm(current => ({ ...current, ...patch }))
     setProblem(null)
   }
   const setSchedule = (patch: Partial<JobDraft['schedule']>) => set({ schedule: { ...form.schedule, ...patch } })
   const chosenSkill = board.skills.find(entry => entry.name === skill.replace(/^\//, ''))
+
+  // Every change is kept until the task is saved or the draft dropped: closing loses nothing
+  useEffect(() => {
+    const kept: KeptDraft = { form, mode, skill, auto, at: new Date().toISOString() }
+    saveMark(key, dirty ? JSON.stringify(kept) : null)
+  }, [snapshot, auto])
+
+  const pickSkill = (next: string) => {
+    setSkill(next)
+    setProblem(null)
+    const found = board.skills.find(entry => entry.name === next.trim().replace(/^\//, ''))
+    const kept = form.mcps.filter(name => !auto.includes(name))
+    const wanted = found ? serversFor(found.services, board.mcps).filter(name => !kept.includes(name)) : []
+    setForm(current => ({ ...current, mcps: [...kept, ...wanted] }))
+    setAuto(wanted)
+  }
+
+  const drop = () => {
+    saveMark(key, null)
+    setForm(start.initial.form)
+    setMode(start.initial.mode)
+    setSkill(start.initial.skill)
+    setAuto([])
+    setKeptAt(null)
+    setProblem(null)
+  }
+
+  const cancel = () => {
+    saveMark(key, null)
+    onClose()
+  }
   // A server the job names but Claude no longer declares stays listed, to be unticked
   const servers: Array<{ name: string; status: McpServer['status'] | 'gone' }> = [
     ...board.mcps,
@@ -191,6 +263,7 @@ function JobEditor({
     setSaving(true)
     try {
       await window.flux.saveJob(view?.job.id ?? null, draft)
+      saveMark(key, null)
       onSaved(view ? 'Tâche enregistrée' : 'Tâche créée')
     } catch (error) {
       setProblem((error as Error).message)
@@ -207,6 +280,7 @@ function JobEditor({
     }
     try {
       await window.flux.removeJob(view.job.id)
+      saveMark(key, null)
       onSaved(`${view.job.name} supprimé`)
     } catch (error) {
       onError((error as Error).message)
@@ -242,6 +316,15 @@ function JobEditor({
           </div>
         </header>
 
+        {keptAt && dirty && (
+          <p className="job-kept" role="status">
+            Brouillon repris, laissé il y a {waitingFor(keptAt)}.
+            <button type="button" onClick={drop}>
+              Effacer
+            </button>
+          </p>
+        )}
+
         <label>
           Nom
           <input
@@ -265,14 +348,7 @@ function JobEditor({
           </div>
           {mode === 'skill' && (
             <>
-              <SkillPicker
-                value={skill}
-                skills={board.skills}
-                onChange={next => {
-                  setSkill(next)
-                  setProblem(null)
-                }}
-              />
+              <SkillPicker value={skill} skills={board.skills} onChange={pickSkill} />
               {chosenSkill?.description && <small>{chosenSkill.description}</small>}
             </>
           )}
@@ -377,13 +453,14 @@ function JobEditor({
                   className={`job-mcp ${server.status}`}
                   aria-pressed={form.mcps.includes(server.name)}
                   title={`${server.name} · ${MCP_STATUS[server.status]}`}
-                  onClick={() =>
+                  onClick={() => {
                     set({
                       mcps: form.mcps.includes(server.name)
                         ? form.mcps.filter(name => name !== server.name)
                         : [...form.mcps, server.name],
                     })
-                  }
+                    setAuto(current => current.filter(name => name !== server.name))
+                  }}
                 >
                   <span className="job-mcp-dot" aria-hidden="true" />
                   {mcpLabel(server.name)}
@@ -394,7 +471,9 @@ function JobEditor({
           <small>
             {form.mcps.length === 0
               ? 'Aucun coché : la tâche tourne sans MCP.'
-              : 'La tâche n’a accès qu’aux MCP cochés, les autres lui sont refusés.'}
+              : mode === 'skill' && auto.length > 0
+                ? `${auto.map(mcpLabel).join(', ')} : coché${auto.length > 1 ? 's' : ''} parce que /${skill.trim().replace(/^\//, '')} s’en sert. Les MCP non cochés sont refusés.`
+                : 'La tâche n’a accès qu’aux MCP cochés, les autres lui sont refusés.'}
           </small>
         </div>
 
@@ -485,7 +564,7 @@ function JobEditor({
               {confirming ? `Supprimer « ${view.job.name} »` : 'Supprimer'}
             </button>
           )}
-          <button type="button" className="pill glass small" onClick={onClose}>
+          <button type="button" className="pill glass small" onClick={cancel}>
             Annuler
           </button>
           <button type="submit" className="pill solid small" disabled={saving}>
