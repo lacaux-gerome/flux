@@ -31,7 +31,8 @@ interface AuthStatus {
   subscriptionType?: string
 }
 
-function subscriptionEnv(): NodeJS.ProcessEnv {
+// Claude on your session, never on an API key; enough for the CLI commands that ask no model
+export function subscriptionEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env }
   NON_SUBSCRIPTION_ENV.forEach(name => delete env[name])
   return env

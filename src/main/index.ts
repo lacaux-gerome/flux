@@ -17,21 +17,41 @@ import {
   type MenuItemConstructorOptions,
   type WebContents,
 } from 'electron'
+import type { McpDraft } from '../shared/claude'
 import type { JobDraft } from '../shared/jobs'
 import { FLUX_SCHEME, fluxLink, linkMenuEntries, parseFluxLink, type LinkMenu } from '../shared/links'
 import { PROFILE_LABEL, type ProfilesPatch } from '../shared/profiles'
 import type { AppState, ProjectOptions, ProposedAction, SettingsPatch, Topic } from '../shared/types'
+import { McpManager } from './claude/mcp'
+import { SkillLibrary } from './claude/skills'
+import { TranscriptUsage } from './claude/usage'
+import { SkillVersions } from './claude/versions'
 import { CONFIG } from './config'
+import { run } from './exec'
 import { Flux } from './engine/poller'
 import { listMcpServers, listSkills } from './jobs/catalog'
 import { JobScheduler, launchClaude } from './jobs/scheduler'
-import { Daily, localDate } from './llm/daily'
+import { subscriptionEnv } from './llm/claude'
+import { Daily, dailyTask, localDate } from './llm/daily'
 import { createDailySkill, useDailyTemplate } from './llm/dailySkillBrief'
 import { Triage } from './llm/triage'
 import { notificationAccess, requestNotificationAccess } from './notificationAccess'
 import { checkCalendarUrl, checkFigma, checkGithub, checkJira, checkLinearKey, normalizeJiraSite } from './onboarding'
 import { ACTIVE_PROFILE, profiles, saveProfiles } from './profile'
-import { ARCHIVE_DIR, DAILY_DIR, FIGMA_FILE, JOBS_FILE, REPOS_DIR, THREADS_DIR, TOPICS_DIR } from './paths'
+import {
+  ARCHIVE_DIR,
+  BIN,
+  CLAUDE_PROJECTS_DIR,
+  DAILY_DIR,
+  FIGMA_FILE,
+  JOBS_FILE,
+  MCP_FILE,
+  REPOS_DIR,
+  SKILL_USAGE_FILE,
+  SKILL_VERSIONS_DIR,
+  THREADS_DIR,
+  TOPICS_DIR,
+} from './paths'
 import { fetchCalendar } from './sources/calendar'
 import { fetchMyPulls, GITHUB_HOST, listGithubAccounts, listRecentRepos } from './sources/github'
 import { PullBoard } from './engine/pulls'
@@ -42,7 +62,7 @@ import { fetchStoreReviews } from './sources/stores'
 import { SettingsStore } from './store/settings'
 import { noteFromText, TopicStore } from './store/topics'
 import { closeThreads } from './threads/close'
-import { adoptThreads, openInDesktop, resumeUrl } from './threads/desktop'
+import { adoptThreads, newSessionUrl, openInDesktop, resumeUrl } from './threads/desktop'
 import { goToThread, launchThread } from './threads/launch'
 import { desktopOf } from './threads/sessions'
 import { noReviewRepos } from './workspaces'
@@ -56,6 +76,8 @@ let flux: Flux
 let settings: SettingsStore
 let daily: Daily
 let jobs: JobScheduler
+let skills: SkillLibrary
+let mcps: McpManager
 const liveNotifications = new Set<Notification>()
 // A flux:// link waits here until the window can take it
 let pendingLink: string | null = null
@@ -432,6 +454,16 @@ function registerIpc(): void {
   ipcMain.handle('flux:run-job', (_event, id: string) => jobs.runNow(id))
   ipcMain.handle('flux:refresh-mcps', () => jobs.refreshMcps(true))
   ipcMain.handle('flux:open-job-run', (_event, session: string) => openInDesktop(resumeUrl(session)))
+  ipcMain.handle('flux:skills', () => skills.list())
+  ipcMain.handle('flux:skill-detail', (_event, id: string) => skills.detail(id))
+  ipcMain.handle('flux:skill-version', (_event, id: string, n: number) => skills.version(id, n))
+  ipcMain.handle('flux:validate-skill', (_event, id: string) => skills.validate(id))
+  ipcMain.handle('flux:edit-skill', (_event, id: string) => skills.edit(id))
+  ipcMain.handle('flux:mcp-servers', () => mcps.snapshot())
+  ipcMain.handle('flux:check-mcp-servers', () => mcps.refresh())
+  ipcMain.handle('flux:reconnect-mcp', (_event, name: string) => mcps.reconnect(name))
+  ipcMain.handle('flux:remove-mcp', (_event, name: string) => mcps.remove(name))
+  ipcMain.handle('flux:add-mcp', (_event, draft: McpDraft) => mcps.add(draft))
   ipcMain.handle('flux:pick-folder', async (event, current: string) => {
     const owner = BrowserWindow.fromWebContents(event.sender)
     const options = {
@@ -443,19 +475,46 @@ function registerIpc(): void {
   })
 }
 
+function broadcast(channel: string, payload: unknown): void {
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send(channel, payload)
+}
+
+const defaultCwd = () => (existsSync(REPOS_DIR) ? REPOS_DIR : homedir())
+
 function startJobs(): JobScheduler {
   return new JobScheduler(JOBS_FILE, {
     launch: launchClaude,
     listMcps: listMcpServers,
     listSkills: () => listSkills(),
-    defaultCwd: existsSync(REPOS_DIR) ? REPOS_DIR : homedir(),
+    daily: () => dailyTask(new Date(), settings.values.dailyTime, settings.values.workdayEnd),
+    defaultCwd: defaultCwd(),
     onChange(board) {
-      for (const window of BrowserWindow.getAllWindows()) window.webContents.send('flux:jobs-board', board)
+      broadcast('flux:jobs-board', board)
     },
     onFinish(job, run) {
       const title = run.status === 'ok' ? `${job.name} est terminé` : `${job.name} a échoué`
-      notify(title, run.summary ?? '', () => openLink(fluxLink({ kind: 'tab', tab: 'jobs' })))
+      notify(title, run.summary ?? '', () => openLink(fluxLink({ kind: 'tab', tab: 'claude' })))
     },
+  })
+}
+
+// The Claude space: the skills and their versions, the MCP servers through the claude CLI
+function startClaudeSpace(): void {
+  skills = new SkillLibrary({
+    home: homedir(),
+    versions: new SkillVersions(SKILL_VERSIONS_DIR),
+    transcripts: new TranscriptUsage(CLAUDE_PROJECTS_DIR, SKILL_USAGE_FILE),
+    openSession: (prompt, folders) => openInDesktop(newSessionUrl(prompt, folders)),
+    onChange: board => broadcast('flux:skills-board', board),
+  })
+  mcps = new McpManager({
+    home: homedir(),
+    cwd: defaultCwd(),
+    file: MCP_FILE,
+    claude: (args, options) => run(BIN.claude, args, { ...options, env: subscriptionEnv() }),
+    connectors: () => jobs.board().mcps,
+    refreshConnectors: () => jobs.refreshMcps(true),
+    onChange: board => broadcast('flux:mcp-board', board),
   })
 }
 
@@ -530,6 +589,7 @@ async function main(): Promise<void> {
 
   daily.sync(new Date())
   jobs = startJobs()
+  startClaudeSpace()
   registerIpc()
   // Warm the account list so the settings panel opens with profile pictures already there
   void listGithubAccounts().catch(() => undefined)

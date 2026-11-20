@@ -15,6 +15,7 @@ import {
   type Job,
   type JobBoard,
   type JobDraft,
+  type DailyTask,
   type JobRun,
   type McpServer,
   type SkillOption,
@@ -50,6 +51,8 @@ export interface JobDeps {
   // The servers a run started in this folder would load
   listMcps(cwd: string): Promise<McpServer[]>
   listSkills(): Promise<SkillOption[]>
+  // Flux's own daily, shown with the jobs though it runs apart
+  daily(): Promise<DailyTask | null>
   defaultCwd: string
   onChange(board: JobBoard): void
   onFinish(job: Job, run: JobRun): void
@@ -132,6 +135,7 @@ const sameSchedule = (a: Job['schedule'], b: Job['schedule']) => JSON.stringify(
 export class JobScheduler {
   private state: JobsState = { jobs: [], runs: [], slots: {}, mcps: { at: null, servers: [] } }
   private skills: SkillOption[] = []
+  private daily: DailyTask | null = null
   private live = new Map<string, AbortController>()
   private mcpsLoading: Promise<void> | null = null
   private writing: Promise<void> = Promise.resolve()
@@ -153,6 +157,7 @@ export class JobScheduler {
     }
     if (stopped.length > 0) await this.persist()
     this.skills = await this.deps.listSkills().catch(() => [])
+    this.daily = await this.deps.daily().catch(() => null)
     this.emit()
     void this.refreshMcps(false).catch(() => undefined)
     this.timer = setInterval(() => void this.tick(), TICK_MS)
@@ -176,6 +181,7 @@ export class JobScheduler {
           .sort(newest)
           .slice(0, RUNS_SHOWN),
       })),
+      daily: this.daily,
       mcps: this.state.mcps.servers,
       mcpsAt: this.state.mcps.at,
       mcpsLoading: this.mcpsLoading !== null,
@@ -187,6 +193,7 @@ export class JobScheduler {
   // What the tab shows on opening: skills read again, servers asked again once stale
   async snapshot(): Promise<JobBoard> {
     this.skills = await this.deps.listSkills().catch(() => this.skills)
+    this.daily = await this.deps.daily().catch(() => this.daily)
     void this.refreshMcps(false).catch(() => undefined)
     return this.board()
   }
@@ -215,7 +222,7 @@ export class JobScheduler {
     const clean = normalize(draft)
     const now = this.now().toISOString()
     const existing = id === null ? undefined : this.state.jobs.find(job => job.id === id)
-    if (id !== null && !existing) throw new Error('Ce job n’existe plus.')
+    if (id !== null && !existing) throw new Error('Cette tâche n’existe plus.')
     const job: Job = existing
       ? { ...existing, ...clean }
       : { ...clean, id: slug(clean.name, new Set(this.state.jobs.map(entry => entry.id))), createdAt: now }
@@ -253,8 +260,8 @@ export class JobScheduler {
   // Resolves once the run has started, not when it ends
   async runNow(id: string): Promise<void> {
     const job = this.state.jobs.find(entry => entry.id === id)
-    if (!job) throw new Error('Ce job n’existe plus.')
-    if (this.live.has(id)) throw new Error('Ce job tourne déjà.')
+    if (!job) throw new Error('Cette tâche n’existe plus.')
+    if (this.live.has(id)) throw new Error('Cette tâche tourne déjà.')
     void this.execute(job, 'manual')
   }
 

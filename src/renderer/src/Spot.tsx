@@ -106,17 +106,17 @@ interface TabSpec {
   on?: Range | Range[]
 }
 
-const TAB_ORDER = ['File', 'En cours', 'Attente', 'À démarrer', 'Mes PR', 'Planifiés', 'Journée']
+const TAB_ORDER = ['File', 'En cours', 'Attente', 'À démarrer', 'Mes PR', 'Journée', 'Claude']
 const TAB_WIDTH: Record<string, number> = {
   File: 62,
   'En cours': 86,
   Attente: 80,
   'À démarrer': 98,
   'Mes PR': 76,
-  Planifiés: 90,
   Journée: 80,
+  Claude: 86,
 }
-const TAB_COUNT: Record<string, number> = { File: 4, 'En cours': 2, Attente: 2, 'À démarrer': 2, 'Mes PR': 6, Planifiés: 2 }
+const TAB_COUNT: Record<string, number> = { File: 4, 'En cours': 2, Attente: 2, 'À démarrer': 2, 'Mes PR': 6 }
 // Where the first tab starts: .w-tabs sits 4px left of it, its padding
 const TABS_LEFT = 174
 // The centre of each tab, for the cursor
@@ -186,6 +186,7 @@ function Count({ count }: { count: TabSpec['count'] }) {
 function TabLabel({ tab }: { tab: TabSpec }) {
   return (
     <span className="w-tab-label">
+      {tab.label === 'Claude' && <BrandIcon brand="claude" size={12} />}
       {tab.label}
       <Count count={tab.count} />
     </span>
@@ -1390,7 +1391,7 @@ function DayPicture() {
   )
 }
 
-/* Planifiés: the Claude jobs Flux runs, a prompt or a skill, each with the MCP servers it may use */
+/* Claude, tasks: the Claude jobs Flux runs, a prompt or a skill, each with the MCP servers it may use */
 
 const JB = { TAB: 1.4, PAGE: 1.7, NEW: 4.2, NAME: 5, PROMPT: 5.7, MCP: 8, SAVE: 10.6, RUN: 12.2, DONE: 14.2 }
 const JB_NEW: [number, number] = [732, 117]
@@ -1477,7 +1478,7 @@ function JobForm() {
   return (
     <span className="w-job-form">
       <span className="w-job-form-head">
-        <b>Nouveau job</b>
+        <b>Nouvelle tâche</b>
         <span className="w-switch" />
       </span>
       <span className="w-field">
@@ -1519,7 +1520,7 @@ function JobForm() {
             <McpChip key={label} label={label} on={on} />
           ))}
         </span>
-        <small>Le job n’a accès qu’aux MCP cochés, les autres lui sont refusés.</small>
+        <small>La tâche n’a accès qu’aux MCP cochés, les autres lui sont refusés.</small>
       </span>
       <span className="w-job-form-foot">
         <span className="w-button small">Annuler</span>
@@ -1534,19 +1535,19 @@ function JobForm() {
 function JobsPicture() {
   const specs = tabs({
     File: { on: [0, JB.TAB] },
-    Planifiés: { on: [JB.TAB, 99], count: [2, 3, JB.SAVE + 0.3] },
+    Claude: { on: [JB.TAB, 99] },
   })
   const action = (
     <span className="w-button small solid w-press" style={d(JB.NEW)}>
       <Plus size={12} />
-      Nouveau job
+      Nouvelle tâche
     </span>
   )
   const sub = (
     <Ticker
       values={[
-        [0, '2 jobs · prochain : Daily du matin, demain 9:00'],
-        [JB.SAVE + 0.3, '3 jobs · prochain : Daily du matin, demain 9:00'],
+        [0, '2 tâches · prochain : Daily du matin, demain 9:00'],
+        [JB.SAVE + 0.3, '3 tâches · prochain : Daily du matin, demain 9:00'],
       ]}
     />
   )
@@ -1554,7 +1555,7 @@ function JobsPicture() {
     <Chrome specs={specs}>
       <FileView className="w-out" style={d(JB.PAGE)} />
       <div className="w-layer w-in" style={d(JB.PAGE + 0.1)}>
-        <Sheet title="Planifiés" sub={sub} action={action}>
+        <Sheet title="Claude" sub={sub} action={action}>
           <span className="w-section">
             {JOBS.map((job, index) => (
               <JobLine
@@ -1969,7 +1970,7 @@ export const SCENES: Scene[] = [
     rank: 5,
     ms: 16500,
     captions: [
-      [0.3, 'Planifiés : les jobs Claude que Flux lance pour toi.'],
+      [0.3, 'L’onglet Claude : tes skills, tes MCP, et les tâches que Flux lance pour toi.'],
       [JB.NEW - 0.6, 'Un prompt ou une skill, les jours et l’heure.'],
       [JB.MCP - 0.8, 'Tu coches les MCP qu’il peut utiliser ; les autres lui sont refusés.'],
       [JB.RUN - 0.6, 'À l’heure dite, ou d’un clic, Claude s’en charge.'],
@@ -1986,8 +1987,8 @@ export const SCENES: Scene[] = [
       [0, 600, 240, 0],
       [0.3, 600, 240, 0],
       [0.5, 600, 240],
-      [JB.TAB - 0.1, TAB_X['Planifiés'], TAB_Y],
-      [JB.TAB + 0.5, TAB_X['Planifiés'], TAB_Y],
+      [JB.TAB - 0.1, TAB_X['Claude'], TAB_Y],
+      [JB.TAB + 0.5, TAB_X['Claude'], TAB_Y],
       [JB.NEW - 0.1, ...JB_NEW],
       [JB.NEW + 0.5, ...JB_NEW],
       [JB.MCP - 0.1, ...JB_SENTRY],
@@ -2000,14 +2001,14 @@ export const SCENES: Scene[] = [
       [JB.RUN + 1, ...JB_PLAY, 0],
     ],
     clicks: [
-      [JB.TAB, TAB_X['Planifiés'], TAB_Y],
+      [JB.TAB, TAB_X['Claude'], TAB_Y],
       [JB.NEW, ...JB_NEW],
       [JB.MCP, ...JB_SENTRY],
       [JB.MCP + 0.6, ...JB_LINEAR],
       [JB.SAVE, ...JB_SAVE],
       [JB.RUN, ...JB_PLAY],
     ],
-    focus: [tabFocus('Planifiés', JB.TAB - 0.9, JB.TAB + 0.3), [JB.DONE + 0.2, 16, 166, 244, 628, 52, 16]],
+    focus: [tabFocus('Claude', JB.TAB - 0.9, JB.TAB + 0.3), [JB.DONE + 0.2, 16, 166, 244, 628, 52, 16]],
     Picture: JobsPicture,
   },
 ]

@@ -123,7 +123,7 @@ describe('lancement d’un job', () => {
 
   it('dit ce qui manque avant d’enregistrer', () => {
     expect(draftProblem(draft())).toBeNull()
-    expect(draftProblem(draft({ name: ' ' }))).toBe('Donne un nom au job.')
+    expect(draftProblem(draft({ name: ' ' }))).toBe('Donne un nom à la tâche.')
     expect(draftProblem(draft({ skill: null, prompt: '' }))).toBe('Écris le prompt.')
     expect(draftProblem(draft({ schedule: { ...WEEKDAYS, days: [] } }))).toBe('Choisis au moins un jour.')
   })
@@ -143,6 +143,7 @@ describe('planificateur', () => {
         { name: 'sentry', status: 'ok' as const },
       ]),
       listSkills: async () => [],
+      daily: async () => null,
       defaultCwd: '/tmp',
       onChange: () => undefined,
       onFinish: vi.fn(),
@@ -193,7 +194,7 @@ describe('planificateur', () => {
     const { scheduler } = await setup(at(17, 8), launch)
     const saved = await scheduler.save(null, draft({ schedule: { repeat: 'manual', days: [], time: '09:00' } }))
     await scheduler.runNow(saved.id)
-    await expect(scheduler.runNow(saved.id)).rejects.toThrow('Ce job tourne déjà.')
+    await expect(scheduler.runNow(saved.id)).rejects.toThrow('Cette tâche tourne déjà.')
     await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1))
     finish()
     await vi.waitFor(() => expect(scheduler.board().jobs[0].runs[0]?.status).toBe('ok'))

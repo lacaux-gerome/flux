@@ -21,6 +21,7 @@ import {
   WEEK_ORDER,
   WEEKDAYS,
   whenLabel,
+  type DailyTask,
   type JobBoard,
   type JobDraft,
   type JobRepeat,
@@ -28,6 +29,7 @@ import {
   type JobView,
   type McpServer,
 } from '../../shared/jobs'
+import type { DailySheet } from '../../shared/types'
 import { TimePicker } from './TimePicker'
 
 const DAY_LETTER = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
@@ -85,13 +87,18 @@ function metaOf(view: JobView): string {
 }
 
 function subtitle(board: JobBoard | null, now: Date): string {
-  if (!board) return 'Lecture des jobs…'
-  if (board.jobs.length === 0) return 'Flux lance Claude pour toi, à l’heure dite.'
-  const count = `${board.jobs.length} job${board.jobs.length > 1 ? 's' : ''}`
-  const next = board.jobs
-    .filter(view => view.next)
-    .sort((a, b) => (a.next ?? '').localeCompare(b.next ?? ''))[0]
-  return next?.next ? `${count} · prochain : ${next.job.name}, ${whenLabel(new Date(next.next), now)}` : count
+  if (!board) return 'Lecture des tâches…'
+  // The daily counts: it is a task too, only Flux's own
+  const total = board.jobs.length + (board.daily ? 1 : 0)
+  if (total === 0) return 'Aucune tâche pour l’instant.'
+  const count = `${total} tâche${total > 1 ? 's' : ''}`
+  const next = [
+    ...board.jobs.flatMap(view => (view.next ? [{ name: view.job.name, at: view.next }] : [])),
+    ...(board.daily?.next ? [{ name: 'Daily', at: board.daily.next }] : []),
+  ].sort((a, b) => a.at.localeCompare(b.at))[0]
+  if (!next) return count
+  const at = new Date(next.at)
+  return `${count} · prochain : ${next.name}, ${at <= now ? 'dû maintenant' : whenLabel(at, now)}`
 }
 
 function duration(run: JobRun): string {
@@ -183,7 +190,7 @@ function JobEditor({
     setSaving(true)
     try {
       await window.flux.saveJob(view?.job.id ?? null, draft)
-      onSaved(view ? 'Job enregistré' : 'Job créé')
+      onSaved(view ? 'Tâche enregistrée' : 'Tâche créée')
     } catch (error) {
       setProblem((error as Error).message)
     } finally {
@@ -209,7 +216,7 @@ function JobEditor({
     <div className="scrim" onClick={onClose}>
       <form
         className="settings glass-dark job-editor"
-        aria-label={view ? `Modifier ${view.job.name}` : 'Nouveau job'}
+        aria-label={view ? `Modifier ${view.job.name}` : 'Nouvelle tâche'}
         onSubmit={event => void submit(event)}
         onClick={event => event.stopPropagation()}
         onKeyDown={event => {
@@ -217,7 +224,7 @@ function JobEditor({
         }}
       >
         <header>
-          <h1>{view ? view.job.name : 'Nouveau job'}</h1>
+          <h1>{view ? view.job.name : 'Nouvelle tâche'}</h1>
           <div className="job-editor-head">
             <label className="job-switch" title={form.enabled ? 'Mettre en pause' : 'Réactiver'}>
               <input
@@ -396,8 +403,8 @@ function JobEditor({
           )}
           <small>
             {form.mcps.length === 0
-              ? 'Aucun coché : le job tourne sans MCP.'
-              : 'Le job n’a accès qu’aux MCP cochés, les autres lui sont refusés.'}
+              ? 'Aucun coché : la tâche tourne sans MCP.'
+              : 'La tâche n’a accès qu’aux MCP cochés, les autres lui sont refusés.'}
           </small>
         </div>
 
@@ -492,7 +499,7 @@ function JobEditor({
             Annuler
           </button>
           <button type="submit" className="pill solid small" disabled={saving}>
-            {view ? 'Enregistrer' : 'Créer le job'}
+            {view ? 'Enregistrer' : 'Créer la tâche'}
           </button>
         </footer>
       </form>
@@ -500,76 +507,265 @@ function JobEditor({
   )
 }
 
-export function JobsView({
+function DailyRow({
+  task,
+  sheet,
+  now,
+  onOpenSkill,
+  onOpenDay,
+  onToast,
+}: {
+  task: DailyTask
+  sheet: DailySheet
+  now: Date
+  onOpenSkill(name: string): void
+  onOpenDay(): void
+  onToast(message: string, kind?: 'error'): void
+}) {
+  const [editing, setEditing] = useState(false)
+  const running = sheet.status === 'running'
+  const wroteToday = task.runs[0]?.date === sheet.date
+  const icon = running ? (
+    <LoaderCircle size={16} className="job-icon spin" aria-label="En cours" />
+  ) : sheet.status === 'error' ? (
+    <CircleX size={16} className="job-icon fail" aria-label="Dernière exécution en échec" />
+  ) : wroteToday ? (
+    <CircleCheck size={16} className="job-icon ok" aria-label="Écrit aujourd’hui" />
+  ) : (
+    <CircleDashed size={16} className="job-icon" aria-label="Pas encore écrit aujourd’hui" />
+  )
+  const schedule = describeSchedule({ repeat: 'daily', days: WEEKDAYS, time: task.time })
+  const meta = !task.exists
+    ? `Commande introuvable : ${task.file}`
+    : sheet.status === 'error' && sheet.error
+      ? `${schedule} · Échec : ${sheet.error}`
+      : `${schedule} · lancé par Flux, en lecture seule`
+  const side = running
+    ? 'En cours…'
+    : task.next && Date.parse(task.next) <= now.getTime() + 60_000
+      ? 'dû, au prochain rafraîchissement'
+      : task.next
+        ? whenLabel(new Date(task.next), now)
+        : ''
+  const run = () => void window.flux.runDaily().catch(error => onToast((error as Error).message, 'error'))
+
+  return (
+    <li className="check-row job-row daily-task">
+      {icon}
+      <button type="button" className="check-main" title="Régler le daily" onClick={() => setEditing(true)}>
+        <span className="check-title">
+          <span className="check-ref">/{task.skill}</span>
+          Daily
+          <span className="job-badge">Flux</span>
+        </span>
+        <span className="check-meta">{meta}</span>
+      </button>
+      <span className="check-side">{side}</span>
+      <button
+        type="button"
+        className="round small glass"
+        aria-label="Lancer le daily maintenant"
+        title="Lancer maintenant"
+        disabled={running || !task.exists}
+        onClick={run}
+      >
+        <Play size={13} aria-hidden="true" />
+      </button>
+      {editing && (
+        <DailyEditor
+          task={task}
+          now={now}
+          onClose={() => setEditing(false)}
+          onOpenSkill={() => {
+            setEditing(false)
+            onOpenSkill(task.skill)
+          }}
+          onOpenDay={() => {
+            setEditing(false)
+            onOpenDay()
+          }}
+          onToast={onToast}
+        />
+      )}
+    </li>
+  )
+}
+
+function DailyEditor({
+  task,
+  now,
+  onClose,
+  onOpenSkill,
+  onOpenDay,
+  onToast,
+}: {
+  task: DailyTask
+  now: Date
+  onClose(): void
+  onOpenSkill(): void
+  onOpenDay(): void
+  onToast(message: string, kind?: 'error'): void
+}) {
+  const [time, setTime] = useState(task.time)
+  const [saving, setSaving] = useState(false)
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setSaving(true)
+    try {
+      await window.flux.saveSettings({ dailyTime: time })
+      onToast(`Daily à ${time}`)
+      onClose()
+    } catch (error) {
+      onToast((error as Error).message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <div className="scrim" onClick={onClose}>
+      <form
+        className="settings glass-dark job-editor"
+        aria-label="Daily"
+        onSubmit={event => void save(event)}
+        onClick={event => event.stopPropagation()}
+        onKeyDown={event => {
+          if (event.key === 'Escape') onClose()
+        }}
+      >
+        <header>
+          <h1>Daily</h1>
+          <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        </header>
+        <p className="job-note">
+          Flux lance lui-même <code>/{task.skill}</code> chaque jour ouvré, en lecture seule, et affiche le résultat dans
+          Journée. Ce n’est pas une tâche comme les autres : l’heure vit dans les réglages, la commande dans{' '}
+          <code>paths.dailyCommand</code>.
+        </p>
+        <div className="field">
+          <span>Heure</span>
+          <div className="job-when">
+            <TimePicker value={time} onChange={setTime} />
+          </div>
+          <small>Du lundi au vendredi. Flux doit être ouvert, et GitHub joignable.</small>
+        </div>
+        <section className="field job-history">
+          <span className="job-field-head">Derniers daily</span>
+          {task.runs.length === 0 ? (
+            <small>Aucun encore.</small>
+          ) : (
+            <ul className="job-runs">
+              {task.runs.map(entry => (
+                <li key={entry.date} className="job-run">
+                  <CircleCheck size={16} className="job-icon ok" aria-hidden="true" />
+                  <div className="job-run-main">
+                    <span className="job-run-when">
+                      {entry.at ? whenLabel(new Date(entry.at), now) : entry.date}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <footer>
+          <button type="button" className="pill glass small" onClick={onOpenSkill}>
+            Voir le skill
+          </button>
+          <button type="button" className="pill glass small" onClick={onOpenDay}>
+            Ouvrir Journée
+          </button>
+          <button type="submit" className="pill solid small" disabled={saving || time === task.time}>
+            Enregistrer
+          </button>
+        </footer>
+      </form>
+    </div>
+  )
+}
+
+export function JobsPanel({
   board,
+  daily,
+  onOpenSkill,
+  onOpenDay,
   onToast,
 }: {
   board: JobBoard | null
+  daily: DailySheet
+  onOpenSkill(name: string): void
+  onOpenDay(): void
   onToast(message: string, kind?: 'error'): void
 }) {
-  // null: closed; 'new': a blank job; else the id of the job edited
+  // null: closed; 'new': a blank task; else the id of the task edited
   const [editing, setEditing] = useState<string | null>(null)
   const now = new Date()
   const edited = editing && editing !== 'new' ? board?.jobs.find(view => view.job.id === editing) ?? null : null
   const run = (id: string) => void window.flux.runJob(id).catch(error => onToast((error as Error).message, 'error'))
 
   return (
-    <main className="page">
-      <div className="page-column wrapup">
-        <header className="daily-head">
-          <div>
-            <h1>Planifiés</h1>
-            <p>{subtitle(board, now)}</p>
-          </div>
-          <div className="daily-actions">
-            <button type="button" className="pill solid small" disabled={!board} onClick={() => setEditing('new')}>
-              <Plus size={15} aria-hidden="true" />
-              Nouveau job
-            </button>
-          </div>
-        </header>
-
-        {board && board.jobs.length === 0 && (
-          <section className="job-empty">
-            <p>
-              Un prompt ou une skill, l’heure à laquelle le lancer, et les MCP qu’il peut utiliser. Chaque exécution est
-              une session Claude que tu rouvres d’un clic.
-            </p>
-            <button type="button" className="pill glass small" onClick={() => setEditing('new')}>
-              <Plus size={15} aria-hidden="true" />
-              Créer le premier job
-            </button>
-          </section>
-        )}
-
-        {board && board.jobs.length > 0 && (
-          <ul className="checklist">
-            {board.jobs.map(view => (
-              <li key={view.job.id} className={`check-row job-row${view.job.enabled ? '' : ' paused'}`}>
-                <RunIcon run={view.runs[0]} paused={!view.job.enabled && !running(view)} />
-                <button type="button" className="check-main" title="Modifier" onClick={() => setEditing(view.job.id)}>
-                  <span className="check-title">
-                    {view.job.skill && <span className="check-ref">/{view.job.skill}</span>}
-                    {view.job.name}
-                  </span>
-                  <span className="check-meta">{metaOf(view)}</span>
-                </button>
-                <span className="check-side">{sideOf(view, now)}</span>
-                <button
-                  type="button"
-                  className="round small glass"
-                  aria-label={`Lancer ${view.job.name} maintenant`}
-                  title="Lancer maintenant"
-                  disabled={running(view)}
-                  onClick={() => run(view.job.id)}
-                >
-                  <Play size={13} aria-hidden="true" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+    <section className="jobs">
+      <div className="claude-toolbar">
+        <small>{subtitle(board, now)}</small>
+        <div className="daily-actions">
+          <button type="button" className="pill solid small" disabled={!board} onClick={() => setEditing('new')}>
+            <Plus size={15} aria-hidden="true" />
+            Nouvelle tâche
+          </button>
+        </div>
       </div>
+
+      {board && (board.daily || board.jobs.length > 0) && (
+        <ul className="checklist">
+          {board.daily && (
+            <DailyRow
+              task={board.daily}
+              sheet={daily}
+              now={now}
+              onOpenSkill={onOpenSkill}
+              onOpenDay={onOpenDay}
+              onToast={onToast}
+            />
+          )}
+          {board.jobs.map(view => (
+            <li key={view.job.id} className={`check-row job-row${view.job.enabled ? '' : ' paused'}`}>
+              <RunIcon run={view.runs[0]} paused={!view.job.enabled && !running(view)} />
+              <button type="button" className="check-main" title="Modifier" onClick={() => setEditing(view.job.id)}>
+                <span className="check-title">
+                  {view.job.skill && <span className="check-ref">/{view.job.skill}</span>}
+                  {view.job.name}
+                </span>
+                <span className="check-meta">{metaOf(view)}</span>
+              </button>
+              <span className="check-side">{sideOf(view, now)}</span>
+              <button
+                type="button"
+                className="round small glass"
+                aria-label={`Lancer ${view.job.name} maintenant`}
+                title="Lancer maintenant"
+                disabled={running(view)}
+                onClick={() => run(view.job.id)}
+              >
+                <Play size={13} aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {board && board.jobs.length === 0 && (
+        <section className="job-empty">
+          <p>
+            Un prompt ou une skill, l’heure à laquelle le lancer, et les MCP qu’il peut utiliser. Chaque exécution est une
+            session Claude que tu rouvres d’un clic.
+          </p>
+          <button type="button" className="pill glass small" onClick={() => setEditing('new')}>
+            <Plus size={15} aria-hidden="true" />
+            Créer une tâche
+          </button>
+        </section>
+      )}
 
       {board && editing && (editing === 'new' || edited) && (
         <JobEditor
@@ -584,6 +780,6 @@ export function JobsView({
           onError={message => onToast(message, 'error')}
         />
       )}
-    </main>
+    </section>
   )
 }

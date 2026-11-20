@@ -41,3 +41,8 @@ export const DAILY_SKILL_DIR = join(STATE_DIR, 'daily-skill')
 export const THREADS_DIR = join(STATE_DIR, 'threads')
 // The Claude jobs Flux runs, their last runs, and the MCP servers Claude knows
 export const JOBS_FILE = join(STATE_DIR, 'jobs.json')
+// The last `claude mcp list`, so the Claude space opens on it
+export const MCP_FILE = join(STATE_DIR, 'mcp.json')
+// Skills belong to the machine, not to a profile: their versions and uses sit in ~/.flux itself
+export const SKILL_VERSIONS_DIR = join(HOME, '.flux', 'skills')
+export const SKILL_USAGE_FILE = join(HOME, '.flux', 'skill-usage.json')

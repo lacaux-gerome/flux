@@ -1,4 +1,5 @@
 import type { CalendarName } from './calendars'
+import type { McpBoard, McpDraft, McpEntry, SkillBoard, SkillDetail } from './claude'
 import type { Job, JobBoard, JobDraft } from './jobs'
 import type { LinkMenu } from './links'
 import type { Profiles, ProfilesPatch } from './profiles'
@@ -547,4 +548,22 @@ export interface FluxApi {
   // Opens a run's session in Claude Desktop
   openJobRun(session: string): Promise<void>
   pickFolder(current: string): Promise<string | null>
+  // Your Claude Code skills, last used first; the transcripts are read behind
+  skills(): Promise<SkillBoard>
+  onSkills(listener: (board: SkillBoard) => void): () => void
+  // A skill's content and versions; a skill of yours seen for the first time gets its v1
+  skillDetail(id: string): Promise<SkillDetail>
+  skillVersion(id: string, n: number): Promise<string>
+  // The file as it is becomes the next version, the one before is read only
+  validateSkill(id: string): Promise<SkillDetail>
+  // Opens a Claude Desktop session that edits the skill with you
+  editSkill(id: string): Promise<void>
+  // The last list of MCP servers; a new one is checked behind once it is old
+  mcpServers(): Promise<McpBoard>
+  onMcpServers(listener: (board: McpBoard) => void): () => void
+  checkMcpServers(): Promise<void>
+  // Signs in a server that waits for it, checks any other again
+  reconnectMcp(name: string): Promise<McpEntry>
+  removeMcp(name: string): Promise<void>
+  addMcp(draft: McpDraft): Promise<void>
 }

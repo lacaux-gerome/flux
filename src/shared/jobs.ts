@@ -69,8 +69,22 @@ export interface SkillOption {
   description: string
 }
 
+// Flux's own daily, which runs the daily command each workday morning on its own schedule, apart
+// from the jobs: it lives in the settings (dailyTime) and in the config (paths.dailyCommand)
+export interface DailyTask {
+  // The command as /name calls it
+  skill: string
+  file: string
+  exists: boolean
+  time: string
+  next: string | null
+  // The days it wrote, newest first
+  runs: Array<{ date: string; at: string | null }>
+}
+
 export interface JobBoard {
   jobs: JobView[]
+  daily: DailyTask | null
   mcps: McpServer[]
   // When Claude last said which servers it loads; null until it has
   mcpsAt: string | null
@@ -199,12 +213,24 @@ export function jobArgs(job: Job, servers: string[], session: string): string[] 
   ]
 }
 
+// The daily's next run: each workday at its time, unless today's is written or the day is over
+export function nextDaily(now: Date, time: string, doneToday: boolean, workdayEnd: number): Date | null {
+  const schedule: JobSchedule = { repeat: 'daily', days: WEEKDAYS, time }
+  const [hour, minute] = parseTime(time)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute)
+  const workday = WEEKDAYS.includes(now.getDay())
+  // Due and not yet written: Flux writes it at its next refresh
+  if (workday && !doneToday && today <= now && now.getHours() < workdayEnd) return now
+  if (workday && !doneToday && today > now) return today
+  return nextRun(schedule, new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59))
+}
+
 // What is missing before a draft can be saved, in the words of the form
 export function draftProblem(draft: JobDraft): string | null {
-  if (!draft.name.trim()) return 'Donne un nom au job.'
+  if (!draft.name.trim()) return 'Donne un nom à la tâche.'
   if (draft.skill !== null && !draft.skill.trim().replace(/^\//, '')) return 'Choisis une skill.'
   if (draft.skill === null && !draft.prompt.trim()) return 'Écris le prompt.'
   if (draft.schedule.repeat === 'daily' && draft.schedule.days.length === 0) return 'Choisis au moins un jour.'
-  if (!draft.cwd.trim()) return 'Choisis le dossier où le job tourne.'
+  if (!draft.cwd.trim()) return 'Choisis le dossier où la tâche tourne.'
   return null
 }

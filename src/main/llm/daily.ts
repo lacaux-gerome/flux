@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { mkdir, rename, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import { YESTERDAY_LABEL, HEALTH_LEVELS } from '../../shared/dailyLabels'
+import { nextDaily, type DailyTask } from '../../shared/jobs'
 import { RANKS } from '../../shared/ranks'
 import type { AppState, DailyContent, DailyRun, HealthItem, HealthLevel, HealthLine } from '../../shared/types'
 import { CONFIG } from '../config'
@@ -43,6 +44,35 @@ export function isDailyDue(
 ): boolean {
   const weekend = now.getDay() === 0 || now.getDay() === 6
   return !weekend && !hasContent && localTime(now) >= dailyTime && now.getHours() < workdayEnd
+}
+
+const DAILY_RUNS_SHOWN = 5
+
+// The daily as a task among the others: its command, its time, and the days it wrote
+export async function dailyTask(now: Date, dailyTime: string, workdayEnd: number, dir = DAILY_STATE_DIR): Promise<DailyTask> {
+  const dates = (await readdir(dir).catch(() => [] as string[]))
+    .filter(file => /^\d{4}-\d{2}-\d{2}\.json$/.test(file))
+    .map(file => file.slice(0, -'.json'.length))
+    .sort()
+    .reverse()
+  const runs = await Promise.all(
+    dates.slice(0, DAILY_RUNS_SHOWN).map(async date => {
+      try {
+        const content = JSON.parse(await readFile(join(dir, `${date}.json`), 'utf8')) as Partial<DailyContent>
+        return { date, at: content.generatedAt ?? null }
+      } catch {
+        return { date, at: null }
+      }
+    }),
+  )
+  return {
+    skill: basename(DAILY_COMMAND, '.md'),
+    file: DAILY_COMMAND,
+    exists: hasDailySkill(),
+    time: dailyTime,
+    next: nextDaily(now, dailyTime, dates[0] === localDate(now), workdayEnd)?.toISOString() ?? null,
+    runs,
+  }
 }
 
 // The ids Flux accepts back: anything else in the answer is dropped

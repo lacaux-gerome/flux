@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { McpBoard, SkillBoard } from '../shared/claude'
 import type { JobBoard } from '../shared/jobs'
 import type { AppState, FluxApi, SourceProgress } from '../shared/types'
 
@@ -86,6 +87,26 @@ const api: FluxApi = {
   refreshMcps: () => ipcRenderer.invoke('flux:refresh-mcps'),
   openJobRun: session => ipcRenderer.invoke('flux:open-job-run', session),
   pickFolder: current => ipcRenderer.invoke('flux:pick-folder', current),
+  skills: () => ipcRenderer.invoke('flux:skills'),
+  onSkills(listener) {
+    const handler = (_event: unknown, board: SkillBoard) => listener(board)
+    ipcRenderer.on('flux:skills-board', handler)
+    return () => ipcRenderer.removeListener('flux:skills-board', handler)
+  },
+  skillDetail: id => ipcRenderer.invoke('flux:skill-detail', id),
+  skillVersion: (id, n) => ipcRenderer.invoke('flux:skill-version', id, n),
+  validateSkill: id => ipcRenderer.invoke('flux:validate-skill', id),
+  editSkill: id => ipcRenderer.invoke('flux:edit-skill', id),
+  mcpServers: () => ipcRenderer.invoke('flux:mcp-servers'),
+  onMcpServers(listener) {
+    const handler = (_event: unknown, board: McpBoard) => listener(board)
+    ipcRenderer.on('flux:mcp-board', handler)
+    return () => ipcRenderer.removeListener('flux:mcp-board', handler)
+  },
+  checkMcpServers: () => ipcRenderer.invoke('flux:check-mcp-servers'),
+  reconnectMcp: name => ipcRenderer.invoke('flux:reconnect-mcp', name),
+  removeMcp: name => ipcRenderer.invoke('flux:remove-mcp', name),
+  addMcp: draft => ipcRenderer.invoke('flux:add-mcp', draft),
 }
 
 contextBridge.exposeInMainWorld('flux', api)

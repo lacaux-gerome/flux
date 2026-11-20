@@ -17,12 +17,13 @@ import type { JobBoard } from '../../shared/jobs'
 import type { Profiles } from '../../shared/profiles'
 import type { AppState, MyPulls, Settings as FluxSettings, SourceName } from '../../shared/types'
 import { Boot, type BootProgress } from './Boot'
+import { BrandIcon } from './Brand'
 import { Changelog } from './Changelog'
 import { DailyView } from './DailyView'
 import { clock, until } from './format'
 import { Hero, LooseHero } from './Hero'
 import { Inspector } from './Inspector'
-import { JobsView } from './JobsView'
+import { ClaudeSpace, type ClaudePart } from './ClaudeSpace'
 import { Onboarding } from './Onboarding'
 import {
   allViews,
@@ -63,7 +64,7 @@ const SOURCE_LABEL: Record<SourceName, string> = {
 }
 
 function isSheet(tab: Tab): tab is SheetTab {
-  return tab === 'pulls' || tab === 'jobs' || tab === 'wrapup' || tab === 'daily'
+  return tab === 'pulls' || tab === 'claude' || tab === 'wrapup' || tab === 'daily'
 }
 
 type DayTab = 'daily' | 'wrapup'
@@ -151,6 +152,7 @@ export function App() {
   const [pulls, setPulls] = useState<MyPulls | null>(null)
   const [pullsLoading, setPullsLoading] = useState(false)
   const [jobs, setJobs] = useState<JobBoard | null>(null)
+  const [claudePart, setClaudePart] = useState<ClaudePart>('skills')
 
   // GitHub answers from a cache of a couple of minutes unless forced
   const loadPulls = (force: boolean) => {
@@ -281,10 +283,10 @@ export function App() {
     return window.flux.onJobs(setJobs)
   }, [])
 
-  // Opening the tab reads the skills and MCP servers again
+  // Opening the tasks reads the skills, the MCP servers and the daily again
   useEffect(() => {
-    if (tab === 'jobs') void window.flux.jobs().then(setJobs)
-  }, [tab])
+    if (tab === 'claude' && claudePart === 'tasks') void window.flux.jobs().then(setJobs)
+  }, [tab, claudePart])
   useEffect(
     () =>
       window.flux.onOpenWrapup(() => {
@@ -409,9 +411,9 @@ export function App() {
     },
     { key: 'unstarted', label: 'À démarrer', count: listOf(state, 'unstarted').length },
     { key: 'pulls', label: 'Mes PR', count: pulls?.pulls.length ?? 0 },
-    { key: 'jobs', label: 'Planifiés', count: jobs?.jobs.filter(view => view.job.enabled).length ?? 0 },
     // Daily and wrap-up, under one tab
     { key: 'daily', label: 'Journée', count: 0 },
+    { key: 'claude', label: 'Claude', count: 0 },
   ]
   const failing = (Object.keys(state.sources) as SourceName[]).filter(
     name => !state.sources[name]?.ok,
@@ -517,6 +519,7 @@ export function App() {
                   setSettingsOpen(false)
                 }}
               >
+                {entry.key === 'claude' && <BrandIcon brand="claude" size={14} />}
                 {entry.label}
                 {entry.count > 0 && <span className="count">{entry.count}</span>}
                 {entry.key === 'daily' && (unreadDaily || unreadWrapup) && (
@@ -626,8 +629,15 @@ export function App() {
           <WrapupView wrapup={state.wrapup} onOpen={openTopic} nav={dayTabs} />
         ) : tab === 'pulls' ? (
           <PullsView board={pulls} loading={pullsLoading} onRefresh={() => loadPulls(true)} />
-        ) : tab === 'jobs' ? (
-          <JobsView board={jobs} onToast={(message, kind) => showToast(message, kind === 'error' ? 'error' : 'ok')} />
+        ) : tab === 'claude' ? (
+          <ClaudeSpace
+            jobs={jobs}
+            daily={state.daily}
+            part={claudePart}
+            onPart={setClaudePart}
+            onOpenDay={() => setTab('daily')}
+            onToast={(message, kind) => showToast(message, kind === 'error' ? 'error' : 'ok')}
+          />
         ) : (
           <>
             <main className="focus">
