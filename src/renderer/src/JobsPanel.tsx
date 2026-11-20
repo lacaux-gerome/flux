@@ -30,6 +30,7 @@ import {
   type McpServer,
 } from '../../shared/jobs'
 import type { DailySheet } from '../../shared/types'
+import { SkillPicker } from './SkillPicker'
 import { TimePicker } from './TimePicker'
 
 const DAY_LETTER = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
@@ -264,25 +265,14 @@ function JobEditor({
           </div>
           {mode === 'skill' && (
             <>
-              <input
-                className="job-input"
-                list="job-skills"
+              <SkillPicker
                 value={skill}
-                spellCheck={false}
-                placeholder="gl_daily"
-                aria-label="Skill"
-                onChange={event => {
-                  setSkill(event.target.value)
+                skills={board.skills}
+                onChange={next => {
+                  setSkill(next)
                   setProblem(null)
                 }}
               />
-              <datalist id="job-skills">
-                {board.skills.map(entry => (
-                  <option key={entry.name} value={entry.name}>
-                    {entry.description}
-                  </option>
-                ))}
-              </datalist>
               {chosenSkill?.description && <small>{chosenSkill.description}</small>}
             </>
           )}

@@ -193,6 +193,15 @@ export function jobPrompt(job: Pick<JobDraft, 'skill' | 'prompt'>): string {
   return prompt ? `/${skill} ${prompt}` : `/${skill}`
 }
 
+// The skills a typed filter keeps: those whose name matches first, then those whose description does
+export function matchSkills(skills: SkillOption[], query: string): SkillOption[] {
+  const needle = query.trim().replace(/^\//, '').toLowerCase()
+  if (!needle) return skills
+  const byName = skills.filter(skill => skill.name.toLowerCase().includes(needle))
+  const byText = skills.filter(skill => !byName.includes(skill) && skill.description.toLowerCase().includes(needle))
+  return [...byName, ...byText]
+}
+
 // The claude flags of a run: its session id, its name, and the servers it may use or not. The
 // prompt goes on stdin
 export function jobArgs(job: Job, servers: string[], session: string): string[] {

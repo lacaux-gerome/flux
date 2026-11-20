@@ -5519,6 +5519,132 @@ li.chosen .project-check {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
 }
 
+/* Choix du skill d'une tâche */
+
+.skill-picker {
+  position: relative;
+}
+
+.settings .skill-picker .job-input {
+  padding-right: 38px;
+}
+
+.skill-picker-chevron {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  color: var(--text-3);
+  pointer-events: none;
+  transition: transform 0.15s var(--ease);
+}
+
+.skill-picker:has([aria-expanded='true']) .skill-picker-chevron {
+  transform: rotate(180deg);
+}
+
+.skill-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 10;
+  max-height: 260px;
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 14px;
+  background: #1d2030;
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 18px 44px rgba(0, 0, 0, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+  transform-origin: top center;
+  animation: skill-picker-in 150ms var(--ease) both;
+}
+
+.skill-picker-menu[data-state='closed'] {
+  pointer-events: none;
+  animation: skill-picker-out 100ms ease-in both;
+}
+
+@keyframes skill-picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@keyframes skill-picker-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.skill-picker-menu ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skill-picker-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.skill-picker-option[data-active] {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.skill-picker-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.skill-picker-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skill-picker-name svg {
+  flex: none;
+  color: var(--ok);
+}
+
+.skill-picker-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.skill-picker-empty {
+  margin: 0;
+  padding: 10px;
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 400;
+}
+
 .settings .job-input::placeholder {
   color: var(--text-3);
 }

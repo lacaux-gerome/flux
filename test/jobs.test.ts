@@ -8,6 +8,7 @@ import {
   dueSlot,
   jobArgs,
   jobPrompt,
+  matchSkills,
   mcpLabel,
   nextRun,
   whenLabel,
@@ -126,6 +127,20 @@ describe('lancement d’un job', () => {
     expect(draftProblem(draft({ name: ' ' }))).toBe('Donne un nom à la tâche.')
     expect(draftProblem(draft({ skill: null, prompt: '' }))).toBe('Écris le prompt.')
     expect(draftProblem(draft({ schedule: { ...WEEKDAYS, days: [] } }))).toBe('Choisis au moins un jour.')
+  })
+
+  it('filtre les skills par leur nom d’abord, puis par ce qu’elles font', () => {
+    const skills = [
+      { name: 'gl_daily', description: 'Daily en lecture seule.' },
+      { name: 'gl_commit', description: 'Crée des commits propres.' },
+      { name: 'commit-commands:commit', description: 'Create a git commit' },
+      { name: 'gl_jump_in', description: 'Génère un document jump-in à partir d’un cadrage.' },
+    ]
+    expect(matchSkills(skills, '')).toBe(skills)
+    expect(matchSkills(skills, ' /COMMIT').map(skill => skill.name)).toEqual(['gl_commit', 'commit-commands:commit'])
+    expect(matchSkills(skills, 'lecture').map(skill => skill.name)).toEqual(['gl_daily'])
+    expect(matchSkills(skills, 'gl_').map(skill => skill.name)).toEqual(['gl_daily', 'gl_commit', 'gl_jump_in'])
+    expect(matchSkills(skills, 'cadrage jump')).toEqual([])
   })
 })
 
