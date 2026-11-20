@@ -6,6 +6,7 @@ import {
   CircleCheck,
   CircleDashed,
   CircleX,
+  Clock,
   GitPullRequest,
   GitPullRequestDraft,
   GripVertical,
@@ -105,29 +106,33 @@ interface TabSpec {
   on?: Range | Range[]
 }
 
-const TAB_ORDER = ['File', 'En cours', 'Attente', 'À démarrer', 'Mes PR', 'Journée']
+const TAB_ORDER = ['File', 'En cours', 'Attente', 'À démarrer', 'Mes PR', 'Planifiés', 'Journée']
 const TAB_WIDTH: Record<string, number> = {
   File: 62,
   'En cours': 86,
   Attente: 80,
   'À démarrer': 98,
   'Mes PR': 76,
+  Planifiés: 90,
   Journée: 80,
 }
-const TAB_COUNT: Record<string, number> = { File: 4, 'En cours': 2, Attente: 2, 'À démarrer': 2, 'Mes PR': 6 }
+const TAB_COUNT: Record<string, number> = { File: 4, 'En cours': 2, Attente: 2, 'À démarrer': 2, 'Mes PR': 6, Planifiés: 2 }
+// Where the first tab starts: .w-tabs sits 4px left of it, its padding
+const TABS_LEFT = 174
 // The centre of each tab, for the cursor
 const TAB_X: Record<string, number> = Object.fromEntries(
   TAB_ORDER.map((label, index) => [
     label,
-    239 + TAB_ORDER.slice(0, index).reduce((sum, other) => sum + TAB_WIDTH[other], 0) + TAB_WIDTH[label] / 2,
+    TABS_LEFT + TAB_ORDER.slice(0, index).reduce((sum, other) => sum + TAB_WIDTH[other], 0) + TAB_WIDTH[label] / 2,
   ]),
 )
 const TAB_Y = 32
 
-// A spotlight on one tab of the bar, between two times
-function tabFocus(label: string, from: number, to: number): Focus {
-  const width = TAB_WIDTH[label] + 8
-  return [from, to, TAB_X[label] - width / 2, 12, width, 40, 20]
+// A spotlight on one tab of the bar, or on a run of them, between two times
+function tabFocus(label: string, from: number, to: number, last = label): Focus {
+  const left = TAB_X[label] - TAB_WIDTH[label] / 2 - 4
+  const right = TAB_X[last] + TAB_WIDTH[last] / 2 + 4
+  return [from, to, left, 12, right - left, 40, 20]
 }
 
 const ranges = (on: TabSpec['on']): Range[] =>
@@ -233,17 +238,14 @@ function Chrome({
           Flux
         </span>
         <Tabs specs={specs} />
-        <span className="w-round" style={pos(742, 14)}>
-          <RefreshCw size={13} />
-        </span>
-        <span className="w-round" style={pos(786, 14)}>
+        <span className="w-round" style={pos(774, 14)}>
           <Sparkles size={13} />
         </span>
-        <span className="w-note" style={pos(830, 14)}>
+        <span className="w-note" style={pos(818, 14)}>
           Note
           <Plus size={12} />
         </span>
-        <span className="w-round" style={pos(908, 14)}>
+        <span className="w-round" style={pos(896, 14)}>
           <Gear size={13} />
         </span>
       </div>
@@ -1136,7 +1138,7 @@ function Sheet({
   children,
 }: {
   title: string
-  sub: string
+  sub: ReactNode
   action?: ReactNode
   // Room for the Journée tabs, drawn apart so they stay put while the page changes under them
   nav?: boolean
@@ -1388,6 +1390,216 @@ function DayPicture() {
   )
 }
 
+/* Planifiés: the Claude jobs Flux runs, a prompt or a skill, each with the MCP servers it may use */
+
+const JB = { TAB: 1.4, PAGE: 1.7, NEW: 4.2, NAME: 5, PROMPT: 5.7, MCP: 8, SAVE: 10.6, RUN: 12.2, DONE: 14.2 }
+const JB_NEW: [number, number] = [732, 117]
+const JB_SENTRY: [number, number] = [297, 406]
+const JB_LINEAR: [number, number] = [363, 406]
+const JB_SAVE: [number, number] = [646, 463]
+const JB_PLAY: [number, number] = [766, 270]
+const JOBS: Array<{ skill?: string; name: string; meta: string; side: string }> = [
+  { skill: 'gl_daily', name: 'Daily du matin', meta: 'Du lundi au vendredi à 9:00 · 3 MCP', side: 'demain 9:00' },
+  { name: 'Revue des PR ouvertes', meta: 'Chaque vendredi à 17:00 · 2 MCP', side: 'ven. 17:00' },
+]
+const JOB_MCPS: Array<[label: string, on?: number]> = [
+  ['Sentry', JB.MCP],
+  ['Linear', JB.MCP + 0.6],
+  ['Slack'],
+  ['Notion'],
+  ['Amplitude'],
+  ['Datadog'],
+]
+
+function JobLine({
+  icon,
+  skill,
+  name,
+  meta,
+  side,
+  className,
+  style,
+}: {
+  icon: ReactNode
+  skill?: string
+  name: string
+  meta: string
+  side: ReactNode
+  className?: string
+  style?: CSSProperties
+}) {
+  return (
+    <span className={`w-check w-job ${className ?? ''}`} style={style}>
+      {icon}
+      <span className="w-check-main">
+        <b>
+          {skill && <span className="w-check-ref">/{skill}</span>}
+          {name}
+        </b>
+        <small>{meta}</small>
+      </span>
+      <span className="w-check-side">{side}</span>
+      <span className="w-job-play">
+        <Play size={10} />
+      </span>
+    </span>
+  )
+}
+
+function Segments({ options }: { options: string[] }) {
+  return (
+    <span className="w-seg" style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}>
+      {options.map((option, index) => (
+        <span key={option} className={index === 0 ? 'on' : undefined}>
+          {option}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function McpChip({ label, on }: { label: string; on?: number }) {
+  return (
+    <span className="w-chip">
+      <i />
+      {label}
+      {on !== undefined && (
+        <span className="w-chip-on w-in" style={d(on)}>
+          <i />
+          {label}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function JobForm() {
+  return (
+    <span className="w-job-form">
+      <span className="w-job-form-head">
+        <b>Nouveau job</b>
+        <span className="w-switch" />
+      </span>
+      <span className="w-field">
+        <small>Nom</small>
+        <span className="w-input">
+          <span className="w-in" style={d(JB.NAME)}>
+            Point Sentry du matin
+          </span>
+        </span>
+      </span>
+      <span className="w-field">
+        <small>Action</small>
+        <Segments options={['Un prompt', 'Une skill']} />
+        <span className="w-input tall">
+          <span className="w-in" style={d(JB.PROMPT)}>
+            Liste les nouvelles erreurs Sentry de la nuit et ouvre un ticket Linear pour chacune.
+          </span>
+        </span>
+      </span>
+      <span className="w-field">
+        <small>Récurrence</small>
+        <Segments options={['Certains jours', 'Toutes les heures', 'À la demande']} />
+        <span className="w-days">
+          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, index) => (
+            <span key={index} className={index < 5 ? 'on' : undefined}>
+              {day}
+            </span>
+          ))}
+          <span className="w-time">
+            <Clock size={11} />
+            09:30
+          </span>
+        </span>
+      </span>
+      <span className="w-field">
+        <small>MCP autorisés</small>
+        <span className="w-chips">
+          {JOB_MCPS.map(([label, on]) => (
+            <McpChip key={label} label={label} on={on} />
+          ))}
+        </span>
+        <small>Le job n’a accès qu’aux MCP cochés, les autres lui sont refusés.</small>
+      </span>
+      <span className="w-job-form-foot">
+        <span className="w-button small">Annuler</span>
+        <span className="w-button small solid w-press" style={d(JB.SAVE)}>
+          Créer le job
+        </span>
+      </span>
+    </span>
+  )
+}
+
+function JobsPicture() {
+  const specs = tabs({
+    File: { on: [0, JB.TAB] },
+    Planifiés: { on: [JB.TAB, 99], count: [2, 3, JB.SAVE + 0.3] },
+  })
+  const action = (
+    <span className="w-button small solid w-press" style={d(JB.NEW)}>
+      <Plus size={12} />
+      Nouveau job
+    </span>
+  )
+  const sub = (
+    <Ticker
+      values={[
+        [0, '2 jobs · prochain : Daily du matin, demain 9:00'],
+        [JB.SAVE + 0.3, '3 jobs · prochain : Daily du matin, demain 9:00'],
+      ]}
+    />
+  )
+  return (
+    <Chrome specs={specs}>
+      <FileView className="w-out" style={d(JB.PAGE)} />
+      <div className="w-layer w-in" style={d(JB.PAGE + 0.1)}>
+        <Sheet title="Planifiés" sub={sub} action={action}>
+          <span className="w-section">
+            {JOBS.map((job, index) => (
+              <JobLine
+                key={job.name}
+                {...job}
+                className="w-in"
+                style={d(JB.PAGE + 0.2 + 0.07 * index)}
+                icon={<CircleCheck size={15} className="w-ci ok" />}
+              />
+            ))}
+            <JobLine
+              name="Point Sentry du matin"
+              meta="Du lundi au vendredi à 9:30 · 2 MCP"
+              className="w-in"
+              style={d(JB.SAVE + 0.4)}
+              icon={
+                <Ticker
+                  values={[
+                    [0, <CircleDashed key="new" size={15} className="w-ci" />],
+                    [JB.RUN, <LoaderCircle key="run" size={15} className="w-ci" />],
+                    [JB.DONE, <CircleCheck key="ok" size={15} className="w-ci ok" />],
+                  ]}
+                />
+              }
+              side={
+                <Ticker
+                  values={[
+                    [0, 'demain 9:30'],
+                    [JB.RUN, 'En cours…'],
+                    [JB.DONE, 'demain 9:30'],
+                  ]}
+                />
+              }
+            />
+          </span>
+        </Sheet>
+      </div>
+      <div className="w-layer w-span" style={span(JB.NEW + 0.2, JB.SAVE + 0.1)}>
+        <span className="w-scrim" />
+        <JobForm />
+      </div>
+    </Chrome>
+  )
+}
+
 /* Scenes */
 
 interface Scene {
@@ -1544,10 +1756,10 @@ export const SCENES: Scene[] = [
     ],
     focus: [
       [U.BOTS - 0.2, U.TAB - 1.1, 28, 488, 940, 100, 26],
-      [U.TAB - 0.9, U.TAB + 0.3, 463, 12, 106, 40, 20],
+      tabFocus('À démarrer', U.TAB - 0.9, U.TAB + 0.3),
       [U.TAB + 1.0, U.ACTIVE - 1.2, 28, 488, 592, 100, 26],
-      [U.ACTIVE - 0.9, U.ACTIVE + 0.3, 297, 12, 94, 40, 20],
-      [U.PICK + 0.6, 16, 297, 12, 94, 40, 20],
+      tabFocus('En cours', U.ACTIVE - 0.9, U.ACTIVE + 0.3),
+      tabFocus('En cours', U.PICK + 0.6, 16),
     ],
     Picture: UnstartedPicture,
   },
@@ -1620,7 +1832,7 @@ export const SCENES: Scene[] = [
     ],
     clicks: [[R.CLICK, ...R_BUTTON]],
     focus: [
-      [R.LEAVE - 0.4, R.LEAVE + 1.8, 231, 12, 164, 40, 20],
+      tabFocus('File', R.LEAVE - 0.4, R.LEAVE + 1.8, 'En cours'),
       [R.BACK + 0.4, 13.4, 28, 488, 204, 100, 26],
     ],
     Picture: ReviewsPicture,
@@ -1660,7 +1872,7 @@ export const SCENES: Scene[] = [
       [P.TAB, TAB_X['Mes PR'], TAB_Y],
       [P.CLICK, ...P_ROW],
     ],
-    focus: [[P.TAB - 0.9, P.TAB + 0.3, 561, 12, 84, 40, 20]],
+    focus: [tabFocus('Mes PR', P.TAB - 0.9, P.TAB + 0.3)],
     Picture: PullsPicture,
   },
   {
@@ -1751,6 +1963,52 @@ export const SCENES: Scene[] = [
       tabFocus('File', S.FILE - 0.9, S.FILE + 0.3),
     ],
     Picture: SplitPicture,
+  },
+  {
+    id: 'jobs',
+    rank: 5,
+    ms: 16500,
+    captions: [
+      [0.3, 'Planifiés : les jobs Claude que Flux lance pour toi.'],
+      [JB.NEW - 0.6, 'Un prompt ou une skill, les jours et l’heure.'],
+      [JB.MCP - 0.8, 'Tu coches les MCP qu’il peut utiliser ; les autres lui sont refusés.'],
+      [JB.RUN - 0.6, 'À l’heure dite, ou d’un clic, Claude s’en charge.'],
+      [JB.DONE, 'Chaque exécution est une session, à rouvrir dans Claude.'],
+    ],
+    cam: [
+      cam(0, WINDOW_VIEW),
+      cam(JB.MCP - 1.2, WINDOW_VIEW),
+      [JB.MCP - 0.5, 1.3, 480, 380],
+      [JB.SAVE - 0.9, 1.3, 480, 380],
+      cam(JB.SAVE - 0.3, WINDOW_VIEW),
+    ],
+    cursor: [
+      [0, 600, 240, 0],
+      [0.3, 600, 240, 0],
+      [0.5, 600, 240],
+      [JB.TAB - 0.1, TAB_X['Planifiés'], TAB_Y],
+      [JB.TAB + 0.5, TAB_X['Planifiés'], TAB_Y],
+      [JB.NEW - 0.1, ...JB_NEW],
+      [JB.NEW + 0.5, ...JB_NEW],
+      [JB.MCP - 0.1, ...JB_SENTRY],
+      [JB.MCP + 0.5, ...JB_LINEAR],
+      [JB.MCP + 1.1, ...JB_LINEAR],
+      [JB.SAVE - 0.1, ...JB_SAVE],
+      [JB.SAVE + 0.5, ...JB_SAVE],
+      [JB.RUN - 0.1, ...JB_PLAY],
+      [JB.RUN + 0.6, ...JB_PLAY],
+      [JB.RUN + 1, ...JB_PLAY, 0],
+    ],
+    clicks: [
+      [JB.TAB, TAB_X['Planifiés'], TAB_Y],
+      [JB.NEW, ...JB_NEW],
+      [JB.MCP, ...JB_SENTRY],
+      [JB.MCP + 0.6, ...JB_LINEAR],
+      [JB.SAVE, ...JB_SAVE],
+      [JB.RUN, ...JB_PLAY],
+    ],
+    focus: [tabFocus('Planifiés', JB.TAB - 0.9, JB.TAB + 0.3), [JB.DONE + 0.2, 16, 166, 244, 628, 52, 16]],
+    Picture: JobsPicture,
   },
 ]
 

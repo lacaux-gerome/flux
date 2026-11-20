@@ -3,7 +3,7 @@ import type { AppState, Item, Rank, RefPill, TopicView } from '../../shared/type
 import { displayTitle } from './format'
 
 export type ListTab = 'queue' | 'unstarted' | 'active' | 'waiting'
-export type SheetTab = 'pulls' | 'wrapup' | 'daily'
+export type SheetTab = 'pulls' | 'jobs' | 'wrapup' | 'daily'
 export type Tab = ListTab | SheetTab
 
 export const TAB_LABEL: Record<Tab, string> = {
@@ -12,6 +12,7 @@ export const TAB_LABEL: Record<Tab, string> = {
   active: 'En cours',
   waiting: 'Attente',
   pulls: 'Mes PR',
+  jobs: 'Planifiés',
   wrapup: 'Wrap-up',
   daily: 'Daily',
 }

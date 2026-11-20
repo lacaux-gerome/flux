@@ -2009,7 +2009,7 @@ button.ref-pill:hover {
 
 .w-tabs {
   top: 12px;
-  left: 235px;
+  left: 170px;
   display: flex;
   height: 40px;
   padding: 4px;
@@ -5392,4 +5392,484 @@ li.chosen .project-check {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* Planifiés : les jobs Claude que Flux lance */
+
+.job-row {
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+}
+
+.job-row.paused .check-title {
+  color: var(--text-2);
+}
+
+.job-icon {
+  color: var(--text-3);
+}
+
+.job-icon.ok {
+  color: var(--ok);
+}
+
+.job-icon.fail {
+  color: var(--danger);
+}
+
+.job-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 520px;
+  margin-top: 28px;
+  color: var(--text-2);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.job-editor {
+  width: min(560px, calc(100vw - 48px));
+}
+
+.job-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings .job-switch {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings .job-switch input {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  appearance: none;
+  cursor: pointer;
+}
+
+.settings .job-switch input::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.18s var(--ease);
+}
+
+.settings .job-switch input:checked {
+  background: var(--ok);
+}
+
+.settings .job-switch input:checked::after {
+  transform: translateX(14px);
+}
+
+.settings .job-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+  font-weight: 400;
+  transition:
+    background 0.15s var(--ease),
+    box-shadow 0.15s var(--ease);
+}
+
+.settings input.job-input {
+  height: 40px;
+}
+
+.settings textarea.job-input {
+  padding: 10px 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.settings .job-input:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.settings .job-input:focus {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+}
+
+.settings .job-input::placeholder {
+  color: var(--text-3);
+}
+
+.job-choice {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.job-choice.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.job-choice.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.job-when {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  align-items: center;
+  gap: 10px;
+}
+
+.job-when .time-trigger {
+  height: 36px;
+}
+
+.job-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.job-days .time-preset {
+  height: 36px;
+}
+
+.job-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.job-mcps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.job-mcp {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-2);
+  font-size: 12.5px;
+  transition:
+    background 0.15s var(--ease),
+    color 0.15s var(--ease);
+}
+
+.job-mcp:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--text);
+}
+
+.job-mcp[aria-pressed='true'] {
+  background: var(--solid);
+  color: var(--solid-ink);
+  font-weight: 600;
+}
+
+.job-mcp-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.job-mcp.auth .job-mcp-dot {
+  background: var(--waiting);
+}
+
+.job-mcp.failed .job-mcp-dot,
+.job-mcp.gone .job-mcp-dot {
+  background: var(--danger);
+}
+
+.job-row-fields {
+  grid-template-columns: minmax(0, 1fr) 180px;
+}
+
+.job-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-folder .job-input {
+  flex: 1;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.job-row-fields .time-preset {
+  height: 40px;
+}
+
+.job-runs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -8px;
+}
+
+.job-run {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 10px;
+}
+
+.job-run:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.job-run .job-icon {
+  margin-top: 2px;
+}
+
+.job-run-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.job-run-when {
+  color: var(--text-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.job-run-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.job-problem {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.job-delete {
+  margin-right: auto;
+}
+
+.job-delete.armed {
+  background: rgba(255, 138, 128, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 128, 0.5);
+  color: var(--danger);
+}
+
+.job-row .round:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* Nouveauté Planifiés : la liste des jobs et leur formulaire, en petit */
+
+.w-check.w-job {
+  grid-template-columns: 16px minmax(0, 1fr) auto 24px;
+}
+
+.w-job-play {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-2);
+}
+
+.w-scrim {
+  inset: 0;
+  background: rgba(4, 5, 10, 0.6);
+}
+
+.w-job-form {
+  top: 70px;
+  left: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 460px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(20, 22, 32, 0.97);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.w-job-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+  font-size: 16px;
+}
+
+.w-switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--ok);
+}
+
+.w-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.w-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.w-field > small {
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.w-input {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+}
+
+.w-input.tall {
+  align-items: flex-start;
+  height: 44px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.w-seg,
+.w-days {
+  display: grid;
+  gap: 3px;
+}
+
+.w-days {
+  grid-template-columns: repeat(7, 1fr) 84px;
+}
+
+.w-seg > span,
+.w-days > span {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.w-seg > .on,
+.w-days > .on {
+  background: var(--solid);
+  color: var(--solid-ink);
+  font-weight: 600;
+}
+
+.w-days > .w-time {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.w-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.w-chip,
+.w-chip-on {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.w-chip {
+  position: relative;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-2);
+}
+
+.w-chip-on {
+  position: absolute;
+  inset: 0;
+  background: var(--solid);
+  color: var(--solid-ink);
+  font-weight: 600;
+}
+
+.w-chip i,
+.w-chip-on i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.w-job-form-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.w-job-form-foot .w-button {
+  padding: 0 14px;
 }

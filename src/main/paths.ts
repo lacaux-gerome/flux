@@ -39,3 +39,5 @@ export const WRAPUP_DIR = join(STATE_DIR, 'wrapup')
 export const DAILY_STATE_DIR = join(STATE_DIR, 'daily')
 export const DAILY_SKILL_DIR = join(STATE_DIR, 'daily-skill')
 export const THREADS_DIR = join(STATE_DIR, 'threads')
+// The Claude jobs Flux runs, their last runs, and the MCP servers Claude knows
+export const JOBS_FILE = join(STATE_DIR, 'jobs.json')

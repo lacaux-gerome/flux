@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { JobBoard } from '../shared/jobs'
 import type { AppState, FluxApi, SourceProgress } from '../shared/types'
 
 const api: FluxApi = {
@@ -72,6 +73,19 @@ const api: FluxApi = {
   setIntentions: ids => ipcRenderer.invoke('flux:set-intentions', ids),
   useDailyTemplate: () => ipcRenderer.invoke('flux:use-daily-template'),
   createDailySkill: () => ipcRenderer.invoke('flux:create-daily-skill'),
+  jobs: () => ipcRenderer.invoke('flux:jobs'),
+  onJobs(listener) {
+    const handler = (_event: unknown, board: JobBoard) => listener(board)
+    ipcRenderer.on('flux:jobs-board', handler)
+    return () => ipcRenderer.removeListener('flux:jobs-board', handler)
+  },
+  saveJob: (id, draft) => ipcRenderer.invoke('flux:save-job', id, draft),
+  removeJob: id => ipcRenderer.invoke('flux:remove-job', id),
+  enableJob: (id, enabled) => ipcRenderer.invoke('flux:enable-job', id, enabled),
+  runJob: id => ipcRenderer.invoke('flux:run-job', id),
+  refreshMcps: () => ipcRenderer.invoke('flux:refresh-mcps'),
+  openJobRun: session => ipcRenderer.invoke('flux:open-job-run', session),
+  pickFolder: current => ipcRenderer.invoke('flux:pick-folder', current),
 }
 
 contextBridge.exposeInMainWorld('flux', api)

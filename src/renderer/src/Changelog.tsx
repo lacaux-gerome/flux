@@ -14,6 +14,13 @@ interface Entry {
 // Newest first: the id of the first entry marks what was read
 const ENTRIES: Entry[] = [
   {
+    id: '2026-11-17-planifies',
+    date: '17 nov.',
+    name: 'Planifiés',
+    text: 'Un onglet pour les jobs Claude que Flux lance pour toi : un prompt ou une skill, les jours et l’heure, et les seuls MCP qu’il peut utiliser. Chaque exécution se rouvre dans Claude.',
+    scene: 'jobs',
+  },
+  {
     id: '2026-11-16-decoupage',
     date: '16 nov.',
     name: 'Nouveau découpage',

@@ -53,9 +53,15 @@ async function requireMaxSession(env: NodeJS.ProcessEnv): Promise<void> {
   }
 }
 
-export async function askClaude(request: ClaudeRequest): Promise<ClaudeResult> {
+// The environment of a claude run on your Max session, never on an API key
+export async function claudeEnv(): Promise<NodeJS.ProcessEnv> {
   const env = subscriptionEnv()
   await requireMaxSession(env)
+  return env
+}
+
+export async function askClaude(request: ClaudeRequest): Promise<ClaudeResult> {
+  const env = await claudeEnv()
   const output = await run(
     BIN.claude,
     [

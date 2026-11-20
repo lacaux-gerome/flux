@@ -1,9 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
   app,
   BrowserWindow,
   clipboard,
+  dialog,
   globalShortcut,
   ipcMain,
   Menu,
@@ -15,18 +17,21 @@ import {
   type MenuItemConstructorOptions,
   type WebContents,
 } from 'electron'
-import { FLUX_SCHEME, linkMenuEntries, parseFluxLink, type LinkMenu } from '../shared/links'
+import type { JobDraft } from '../shared/jobs'
+import { FLUX_SCHEME, fluxLink, linkMenuEntries, parseFluxLink, type LinkMenu } from '../shared/links'
 import { PROFILE_LABEL, type ProfilesPatch } from '../shared/profiles'
 import type { AppState, ProjectOptions, ProposedAction, SettingsPatch, Topic } from '../shared/types'
 import { CONFIG } from './config'
 import { Flux } from './engine/poller'
+import { listMcpServers, listSkills } from './jobs/catalog'
+import { JobScheduler, launchClaude } from './jobs/scheduler'
 import { Daily, localDate } from './llm/daily'
 import { createDailySkill, useDailyTemplate } from './llm/dailySkillBrief'
 import { Triage } from './llm/triage'
 import { notificationAccess, requestNotificationAccess } from './notificationAccess'
 import { checkCalendarUrl, checkFigma, checkGithub, checkJira, checkLinearKey, normalizeJiraSite } from './onboarding'
 import { ACTIVE_PROFILE, profiles, saveProfiles } from './profile'
-import { ARCHIVE_DIR, DAILY_DIR, FIGMA_FILE, THREADS_DIR, TOPICS_DIR } from './paths'
+import { ARCHIVE_DIR, DAILY_DIR, FIGMA_FILE, JOBS_FILE, REPOS_DIR, THREADS_DIR, TOPICS_DIR } from './paths'
 import { fetchCalendar } from './sources/calendar'
 import { fetchMyPulls, GITHUB_HOST, listGithubAccounts, listRecentRepos } from './sources/github'
 import { PullBoard } from './engine/pulls'
@@ -37,7 +42,7 @@ import { fetchStoreReviews } from './sources/stores'
 import { SettingsStore } from './store/settings'
 import { noteFromText, TopicStore } from './store/topics'
 import { closeThreads } from './threads/close'
-import { adoptThreads } from './threads/desktop'
+import { adoptThreads, openInDesktop, resumeUrl } from './threads/desktop'
 import { goToThread, launchThread } from './threads/launch'
 import { desktopOf } from './threads/sessions'
 import { noReviewRepos } from './workspaces'
@@ -50,6 +55,7 @@ let tray: Tray | null = null
 let flux: Flux
 let settings: SettingsStore
 let daily: Daily
+let jobs: JobScheduler
 const liveNotifications = new Set<Notification>()
 // A flux:// link waits here until the window can take it
 let pendingLink: string | null = null
@@ -419,6 +425,38 @@ function registerIpc(): void {
     return result
   })
   ipcMain.handle('flux:create-daily-skill', () => createDailySkill())
+  ipcMain.handle('flux:jobs', () => jobs.snapshot())
+  ipcMain.handle('flux:save-job', (_event, id: string | null, draft: JobDraft) => jobs.save(id, draft))
+  ipcMain.handle('flux:remove-job', (_event, id: string) => jobs.remove(id))
+  ipcMain.handle('flux:enable-job', (_event, id: string, enabled: boolean) => jobs.setEnabled(id, enabled))
+  ipcMain.handle('flux:run-job', (_event, id: string) => jobs.runNow(id))
+  ipcMain.handle('flux:refresh-mcps', () => jobs.refreshMcps(true))
+  ipcMain.handle('flux:open-job-run', (_event, session: string) => openInDesktop(resumeUrl(session)))
+  ipcMain.handle('flux:pick-folder', async (event, current: string) => {
+    const owner = BrowserWindow.fromWebContents(event.sender)
+    const options = {
+      defaultPath: current || REPOS_DIR,
+      properties: ['openDirectory' as const, 'createDirectory' as const],
+    }
+    const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options)
+    return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
+}
+
+function startJobs(): JobScheduler {
+  return new JobScheduler(JOBS_FILE, {
+    launch: launchClaude,
+    listMcps: listMcpServers,
+    listSkills: () => listSkills(),
+    defaultCwd: existsSync(REPOS_DIR) ? REPOS_DIR : homedir(),
+    onChange(board) {
+      for (const window of BrowserWindow.getAllWindows()) window.webContents.send('flux:jobs-board', board)
+    },
+    onFinish(job, run) {
+      const title = run.status === 'ok' ? `${job.name} est terminé` : `${job.name} a échoué`
+      notify(title, run.summary ?? '', () => openLink(fluxLink({ kind: 'tab', tab: 'jobs' })))
+    },
+  })
 }
 
 async function main(): Promise<void> {
@@ -491,6 +529,7 @@ async function main(): Promise<void> {
   })
 
   daily.sync(new Date())
+  jobs = startJobs()
   registerIpc()
   // Warm the account list so the settings panel opens with profile pictures already there
   void listGithubAccounts().catch(() => undefined)
@@ -501,7 +540,10 @@ async function main(): Promise<void> {
     app.setLoginItemSettings({ openAtLogin: true })
     app.setAsDefaultProtocolClient(FLUX_SCHEME)
   }
-  powerMonitor.on('resume', () => void flux.refresh())
+  powerMonitor.on('resume', () => {
+    void flux.refresh()
+    void jobs.tick()
+  })
   app.on('second-instance', (_event, argv) => {
     const link = argv.find(arg => arg.startsWith(`${FLUX_SCHEME}://`))
     if (link) openLink(link)
@@ -512,7 +554,9 @@ async function main(): Promise<void> {
   app.on('will-quit', () => {
     globalShortcut.unregisterAll()
     flux.stop()
+    jobs.stop()
   })
+  void jobs.start().catch(error => console.error(error))
   await flux.start()
 }
 

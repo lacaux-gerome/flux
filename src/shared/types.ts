@@ -1,4 +1,5 @@
 import type { CalendarName } from './calendars'
+import type { Job, JobBoard, JobDraft } from './jobs'
 import type { LinkMenu } from './links'
 import type { Profiles, ProfilesPatch } from './profiles'
 import type { TrackerName } from './trackers'
@@ -533,4 +534,17 @@ export interface FluxApi {
   useDailyTemplate(): Promise<CheckResult>
   // Opens a Claude Desktop session that writes the daily skill with the user
   createDailySkill(): Promise<void>
+  // The Claude jobs Flux runs, with the skills and MCP servers they can use
+  jobs(): Promise<JobBoard>
+  onJobs(listener: (board: JobBoard) => void): () => void
+  saveJob(id: string | null, draft: JobDraft): Promise<Job>
+  removeJob(id: string): Promise<void>
+  enableJob(id: string, enabled: boolean): Promise<void>
+  // Resolves once the run has started
+  runJob(id: string): Promise<void>
+  // Asks Claude again which MCP servers it loads
+  refreshMcps(): Promise<void>
+  // Opens a run's session in Claude Desktop
+  openJobRun(session: string): Promise<void>
+  pickFolder(current: string): Promise<string | null>
 }

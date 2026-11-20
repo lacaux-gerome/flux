@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseFluxLink } from '../../shared/links'
+import type { JobBoard } from '../../shared/jobs'
 import type { Profiles } from '../../shared/profiles'
 import type { AppState, MyPulls, Settings as FluxSettings, SourceName } from '../../shared/types'
 import { Boot, type BootProgress } from './Boot'
@@ -21,6 +22,7 @@ import { DailyView } from './DailyView'
 import { clock, until } from './format'
 import { Hero, LooseHero } from './Hero'
 import { Inspector } from './Inspector'
+import { JobsView } from './JobsView'
 import { Onboarding } from './Onboarding'
 import {
   allViews,
@@ -61,7 +63,7 @@ const SOURCE_LABEL: Record<SourceName, string> = {
 }
 
 function isSheet(tab: Tab): tab is SheetTab {
-  return tab === 'pulls' || tab === 'wrapup' || tab === 'daily'
+  return tab === 'pulls' || tab === 'jobs' || tab === 'wrapup' || tab === 'daily'
 }
 
 type DayTab = 'daily' | 'wrapup'
@@ -148,6 +150,7 @@ export function App() {
   const [day, setDay] = useState<DayTab>('daily')
   const [pulls, setPulls] = useState<MyPulls | null>(null)
   const [pullsLoading, setPullsLoading] = useState(false)
+  const [jobs, setJobs] = useState<JobBoard | null>(null)
 
   // GitHub answers from a cache of a couple of minutes unless forced
   const loadPulls = (force: boolean) => {
@@ -271,6 +274,17 @@ export function App() {
   }, [])
 
   useEffect(() => window.flux.onOpenDaily(() => setTab('daily')), [])
+
+  // Jobs come from Flux itself: read once, then each change as it happens
+  useEffect(() => {
+    void window.flux.jobs().then(setJobs)
+    return window.flux.onJobs(setJobs)
+  }, [])
+
+  // Opening the tab reads the skills and MCP servers again
+  useEffect(() => {
+    if (tab === 'jobs') void window.flux.jobs().then(setJobs)
+  }, [tab])
   useEffect(
     () =>
       window.flux.onOpenWrapup(() => {
@@ -395,6 +409,7 @@ export function App() {
     },
     { key: 'unstarted', label: 'À démarrer', count: listOf(state, 'unstarted').length },
     { key: 'pulls', label: 'Mes PR', count: pulls?.pulls.length ?? 0 },
+    { key: 'jobs', label: 'Planifiés', count: jobs?.jobs.filter(view => view.job.enabled).length ?? 0 },
     // Daily and wrap-up, under one tab
     { key: 'daily', label: 'Journée', count: 0 },
   ]
@@ -611,6 +626,8 @@ export function App() {
           <WrapupView wrapup={state.wrapup} onOpen={openTopic} nav={dayTabs} />
         ) : tab === 'pulls' ? (
           <PullsView board={pulls} loading={pullsLoading} onRefresh={() => loadPulls(true)} />
+        ) : tab === 'jobs' ? (
+          <JobsView board={jobs} onToast={(message, kind) => showToast(message, kind === 'error' ? 'error' : 'ok')} />
         ) : (
           <>
             <main className="focus">

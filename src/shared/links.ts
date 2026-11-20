@@ -2,7 +2,7 @@
 
 export const FLUX_SCHEME = 'flux'
 
-export type RouteTab = 'queue' | 'unstarted' | 'active' | 'waiting' | 'pulls' | 'wrapup' | 'daily'
+export type RouteTab = 'queue' | 'unstarted' | 'active' | 'waiting' | 'pulls' | 'jobs' | 'wrapup' | 'daily'
 
 export type FluxRoute =
   | { kind: 'topic'; id: string }
@@ -16,6 +16,7 @@ const TAB_SLUG: Record<RouteTab, string> = {
   active: 'en-cours',
   waiting: 'attente',
   pulls: 'mes-pr',
+  jobs: 'planifies',
   wrapup: 'wrap-up',
   daily: 'daily',
 }
