@@ -174,7 +174,8 @@ input {
 }
 
 /* The wave leaves on the right, then comes back from the left. brand-wave-in is listed first so that,
-   held on its first frame during its delay, it does not hide brand-wave-out */
+   held on its first frame during its delay, it does not hide brand-wave-out; brand-wave-out states its
+   start, otherwise it would start from that held frame, already hidden */
 .brand-wave.waving {
   animation:
     brand-wave-in 200ms var(--ease) 150ms backwards,
@@ -182,6 +183,10 @@ input {
 }
 
 @keyframes brand-wave-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
   to {
     transform: translateX(16px);
     opacity: 0;
