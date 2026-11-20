@@ -21,7 +21,8 @@ import { AddCalendarMenu, AddTrackerMenu, TrackerBadge, TRACKER_HINT, trackerInf
 import { figmaTeamIds } from '../../shared/figma'
 import { calendarInfo } from '../../shared/calendars'
 import { projectTrackers, type TrackerName } from '../../shared/trackers'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useLayer } from './layers'
 import type { GithubAccounts, NotificationAccess, Settings, SettingsPatch } from '../../shared/types'
 
 function InputShell({ icon: Icon, stored, children }: { icon: LucideIcon; stored?: boolean; children: ReactNode }) {
@@ -41,6 +42,9 @@ function InputShell({ icon: Icon, stored, children }: { icon: LucideIcon; stored
 
 // Kept across openings so profile pictures show at once when the panel comes back
 let lastAccounts: GithubAccounts | null = null
+// What was changed and not saved when the window closed, given back when it opens again. Kept in
+// memory only: it may hold a token
+let unsaved: { patch: SettingsPatch; teamsText: string | null } | null = null
 
 const ACCESS_LABEL: Record<NotificationAccess, string> = {
   authorized: 'Autorisées par macOS',
@@ -78,12 +82,40 @@ export function SettingsPanel({
 }) {
   const [view, setView] = useState(initialView)
   const [settings, setSettings] = useState<Settings | null>(null)
-  const [patch, setPatch] = useState<SettingsPatch>({})
+  const [patch, setPatch] = useState<SettingsPatch>(() => unsaved?.patch ?? {})
+  const [restored, setRestored] = useState(unsaved !== null)
   const [saving, setSaving] = useState(false)
   const [accounts, setAccounts] = useState<GithubAccounts | null>(lastAccounts)
   const [access, setAccess] = useState<NotificationAccess | null>(null)
   // The teams field as typed; saved as the team ids it holds
-  const [teamsText, setTeamsText] = useState<string | null>(null)
+  const [teamsText, setTeamsText] = useState<string | null>(() => unsaved?.teamsText ?? null)
+  const form = useRef<HTMLFormElement>(null)
+  const saved = useRef(false)
+  const latest = useRef({ patch, teamsText })
+  latest.current = { patch, teamsText }
+
+  const backToMain = () => {
+    setView('main')
+    // The summary line shows what the page just saved
+    void window.flux.getSettings().then(setSettings)
+  }
+  useLayer(true, onClose, {
+    root: form,
+    // Back from Espaces to the settings, when they are where it was opened from
+    back: () => {
+      if (view !== 'workspaces' || initialView !== 'main') return false
+      backToMain()
+      return true
+    },
+  })
+
+  useEffect(
+    () => () => {
+      const { patch: left, teamsText: text } = latest.current
+      unsaved = saved.current || (Object.keys(left).length === 0 && text === null) ? null : { patch: left, teamsText: text }
+    },
+    [],
+  )
 
   useEffect(() => {
     // Back from System Settings, the window regains focus: read the permission again
@@ -106,6 +138,11 @@ export function SettingsPanel({
       })
   }, [])
 
+  // The window answers the keyboard as soon as it shows, wherever it was opened from
+  useEffect(() => {
+    if (settings && !form.current?.contains(document.activeElement)) form.current?.focus({ preventScroll: true })
+  }, [settings === null, view])
+
   if (!settings) return null
 
   const submit = async (event: FormEvent) => {
@@ -113,6 +150,7 @@ export function SettingsPanel({
     setSaving(true)
     try {
       await window.flux.saveSettings(patch)
+      saved.current = true
       onSaved()
     } catch (error) {
       setSaving(false)
@@ -140,24 +178,19 @@ export function SettingsPanel({
   return (
     <div className="scrim" onClick={onClose}>
     <form
+      ref={form}
       className="settings glass-dark"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Réglages"
+      tabIndex={-1}
+      data-layer
       onSubmit={submit}
       onClick={event => event.stopPropagation()}
-      onKeyDown={event => {
-        if (event.key === 'Escape') onClose()
-      }}
     >
       {view === 'workspaces' ? (
         <WorkspacesView
-          onBack={
-            initialView === 'main'
-              ? () => {
-                  setView('main')
-                  // The summary line shows what the page just saved
-                  void window.flux.getSettings().then(setSettings)
-                }
-              : undefined
-          }
+          onBack={initialView === 'main' ? backToMain : undefined}
           onClose={onClose}
           onError={onError}
         />
@@ -169,6 +202,22 @@ export function SettingsPanel({
           <X size={16} aria-hidden="true" />
         </button>
       </header>
+
+      {restored && (
+        <p className="job-kept" role="status">
+          Modifications non enregistrées reprises.
+          <button
+            type="button"
+            onClick={() => {
+              setPatch({})
+              setTeamsText(null)
+              setRestored(false)
+            }}
+          >
+            Effacer
+          </button>
+        </p>
+      )}
 
       <div className="field">
         <span>Compte GitHub</span>

@@ -1,5 +1,6 @@
 import { Check, ChevronDown, RefreshCw, UserPlus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useLayer } from './layers'
 import type { GithubAccounts } from '../../shared/types'
 
 function Avatar({ src, login, size }: { src?: string | null; login: string; size: number }) {
@@ -28,6 +29,7 @@ export function AccountPicker({
   const [mounted, setMounted] = useState(false)
   const [copied, setCopied] = useState(false)
   const root = useRef<HTMLDivElement>(null)
+  useLayer(open, () => setOpen(false), { root })
 
   useEffect(() => {
     if (open) {
@@ -76,12 +78,6 @@ export function AccountPicker({
     <div
       className="account-picker"
       ref={root}
-      onKeyDown={event => {
-        if (event.key === 'Escape' && open) {
-          event.stopPropagation()
-          setOpen(false)
-        }
-      }}
     >
       <button
         type="button"

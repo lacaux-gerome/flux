@@ -123,6 +123,11 @@ function openMain(): BrowserWindow {
       window.webContents.send('flux:refresh-shortcut')
     }
   })
+  // The system's swipe between pages, when the trackpad is set for it
+  window.on('swipe', (_event, direction) => {
+    if (direction === 'right') window.webContents.send('flux:navigate', 'back')
+    if (direction === 'left') window.webContents.send('flux:navigate', 'forward')
+  })
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null
   })

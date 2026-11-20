@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Play, Sparkles, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useLayer } from './layers'
 import { Spot } from './Spot'
 
 interface Entry {
@@ -171,12 +172,13 @@ function CloseButton({ onClose }: { onClose(): void }) {
 }
 
 // The names first; one opens on its page, with what it changes, its animation, and the way to
-// the next one. Escape steps back: out of fullscreen, then to the list, then out
+// the next one. Escape and ⌘[ step back: out of fullscreen, then to the list, then out
 function ChangelogModal({ unread, onClose }: { unread: Set<string>; onClose(): void }) {
   const [open, setOpen] = useState<number | null>(null)
   const [full, setFull] = useState(false)
   const rows = useRef<Array<HTMLButtonElement | null>>([])
   const last = useRef<number | null>(null)
+  const root = useRef<HTMLDivElement>(null)
   const entry = open === null ? null : ENTRIES[open]
 
   const show = (index: number | null) => {
@@ -186,20 +188,26 @@ function ChangelogModal({ unread, onClose }: { unread: Set<string>; onClose(): v
     setOpen(index)
   }
 
-  // Back on the list, the row of the page just left keeps the focus, and stays in view
+  // Back on the list, the row of the page just left keeps the focus, and stays in view. On a page,
+  // the dialog holds it while the row that had it is hidden
   useEffect(() => {
     if (open === null && last.current !== null) rows.current[last.current]?.focus()
+    else if (open !== null && !(document.activeElement instanceof HTMLElement && document.activeElement.checkVisibility()))
+      root.current?.focus({ preventScroll: true })
   }, [open])
+
+  const stepBack = () => {
+    if (full) setFull(false)
+    else if (open !== null) show(null)
+    else onClose()
+  }
+  useLayer(true, stepBack, { root, focus: true })
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        if (full) setFull(false)
-        else if (open !== null) show(null)
-        else onClose()
-      } else if (open !== null && event.key === 'ArrowLeft') show(open - 1)
-      else if (open !== null && event.key === 'ArrowRight') show(open + 1)
+      if (open === null || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key === 'ArrowLeft') show(open - 1)
+      else if (event.key === 'ArrowRight') show(open + 1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -208,10 +216,13 @@ function ChangelogModal({ unread, onClose }: { unread: Set<string>; onClose(): v
   return (
     <div className="scrim spot-scrim" onClick={onClose}>
       <div
+        ref={root}
         className={`news${entry ? ' detail' : ''}${full ? ' full' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={entry ? `Nouveautés : ${entry.name}` : 'Nouveautés'}
+        tabIndex={-1}
+        data-layer
         onClick={event => event.stopPropagation()}
       >
         <div className="news-list" hidden={entry !== null}>

@@ -15,6 +15,7 @@ import type {
 } from '../../shared/types'
 import { BrandIcon, LinkIcon } from './Brand'
 import { clock, displayTitle, refLabel } from './format'
+import { useLayer } from './layers'
 import { menuOfLine, showMenu } from './navigation'
 import { rankStyle } from './rankStyle'
 
@@ -116,10 +117,8 @@ function NoteButton({ line, onNote }: { line: Line; onNote: LineActions['onNote'
       </button>
     )
   }
-  const close = () => {
-    setEditing(false)
-    setText('')
-  }
+  // What is typed stays until it is added
+  const close = () => setEditing(false)
   return (
     <input
       className="daily-note"
@@ -132,6 +131,7 @@ function NoteButton({ line, onNote }: { line: Line; onNote: LineActions['onNote'
         if (event.key === 'Escape') close()
         if (event.key === 'Enter' && text.trim()) {
           onNote(topicId, text.trim())
+          setText('')
           close()
         }
       }}
@@ -205,8 +205,18 @@ function Today({ sheet, actions }: { sheet: DailySheet; actions: LineActions }) 
   // The list answers at once; the state pushed back by the main process takes over
   const [order, setOrder] = useState<string[] | null>(null)
   const [picking, setPicking] = useState(false)
+  const pick = useRef<HTMLDivElement>(null)
   const dragged = useRef<number | null>(null)
   useEffect(() => setOrder(null), [sheet.intentions])
+  useLayer(picking, () => setPicking(false), { root: pick })
+  useEffect(() => {
+    if (!picking) return undefined
+    const close = (event: MouseEvent) => {
+      if (!pick.current?.contains(event.target as Node)) setPicking(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [picking])
 
   const byId = new Map([...sheet.intentions, ...sheet.candidates].map(line => [line.id, line]))
   const ids = order ?? sheet.intentions.map(line => line.id)
@@ -279,8 +289,13 @@ function Today({ sheet, actions }: { sheet: DailySheet; actions: LineActions }) 
         </ol>
       )}
       {ids.length < MAX_INTENTIONS && candidates.length > 0 && (
-        <div className="daily-pick">
-          <button type="button" className="daily-more" onClick={() => setPicking(value => !value)}>
+        <div className="daily-pick" ref={pick}>
+          <button
+            type="button"
+            className="daily-more"
+            aria-expanded={picking}
+            onClick={() => setPicking(value => !value)}
+          >
             <Plus size={13} aria-hidden="true" />
             Ajouter
           </button>

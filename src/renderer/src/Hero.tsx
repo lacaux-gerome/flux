@@ -1,10 +1,11 @@
 import { ArrowUpRight, Check, Hand, Hourglass, LockOpen, MessageCircleQuestion, Pencil } from 'lucide-react'
-import { useEffect, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import type { LinkMenu } from '../../shared/links'
 import { RANKS } from '../../shared/ranks'
 import type { AskedLine, CommentLine, Item, ProposedAction, TopicView } from '../../shared/types'
 import { BrandIcon, LinkIcon } from './Brand'
 import { displayTitle, markedBlocked, refLabel, waitingFor } from './format'
+import { useLayer } from './layers'
 import { menuOfItem, menuOfView, showMenu } from './navigation'
 import { rankStyle } from './rankStyle'
 import { useDraft } from './useDraft'
@@ -76,6 +77,18 @@ export function Hero({ view, position }: HeroProps) {
   )
   const style = rankStyle(view.rank)
   const Icon = style.icon
+  const titleField = useRef<HTMLTextAreaElement>(null)
+  const pencil = useRef<HTMLButtonElement>(null)
+  const blockForm = useRef<HTMLFormElement>(null)
+
+  // The title is saved as it is typed: Enter and Escape only end the editing, back on the pencil
+  const endEditing = () => {
+    setEditing(false)
+    setTimeout(() => pencil.current?.focus({ preventScroll: true }))
+  }
+  useLayer(editing, endEditing, { root: titleField })
+  // The reason typed stays for the next opening
+  useLayer(blocking, () => setBlocking(false), { root: blockForm })
 
   useEffect(() => {
     setError(null)
@@ -111,11 +124,19 @@ export function Hero({ view, position }: HeroProps) {
       <div className="hero-title">
         {editing ? (
           <textarea
+            ref={titleField}
             autoFocus
             aria-label="Titre du sujet"
             rows={1}
             value={title}
             onChange={event => setTitle(event.target.value.replace(/\n/g, ' '))}
+            // Renaming goes on from the end of the title
+            onFocus={event => event.currentTarget.setSelectionRange(title.length, title.length)}
+            onKeyDown={event => {
+              if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+              event.preventDefault()
+              endEditing()
+            }}
             onBlur={() => setEditing(false)}
           />
         ) : (
@@ -123,6 +144,7 @@ export function Hero({ view, position }: HeroProps) {
         )}
         {!editing && (
           <button
+            ref={pencil}
             type="button"
             className="ghost"
             aria-label="Renommer le sujet"
@@ -216,6 +238,7 @@ export function Hero({ view, position }: HeroProps) {
 
       {blocking && (
         <form
+          ref={blockForm}
           className="block-form glass"
           onSubmit={event => {
             event.preventDefault()

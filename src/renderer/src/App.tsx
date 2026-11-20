@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   CalendarClock,
   CloudOff,
   KeyRound,
@@ -38,6 +39,9 @@ import { PullsView } from './PullsView'
 import { ownerGroups, Rail } from './Rail'
 import { rankStyle, type RankStyle } from './rankStyle'
 import { Search } from './Search'
+import { useBackForward } from './backForward'
+import { useHistory } from './history'
+import { hasLayer } from './layers'
 import { useSlidingThumb } from './SlidingThumb'
 import { SettingsPanel } from './SettingsPanel'
 import { Toast, type ToastMessage } from './Toast'
@@ -115,6 +119,19 @@ function storedClaudePart(): ClaudePart {
   return part === 'mcp' || part === 'tasks' ? part : 'skills'
 }
 
+// Where Flux is: the history steps back and forth between these
+interface Place {
+  tab: Tab
+  // null is the first topic of the list
+  selected: string | null
+  part: ClaudePart
+  // The skill open in the Claude space
+  skill: string | null
+}
+
+const samePlace = (a: Place, b: Place) =>
+  a.tab === b.tab && a.selected === b.selected && a.part === b.part && a.skill === b.skill
+
 // The main views bar: the chosen view's pill slides like the projects toggle's. Daily and wrap-up share one tab
 function ViewTabs({
   tabs,
@@ -154,8 +171,12 @@ function ViewTabs({
 
 export function App() {
   const [state, setState] = useState<AppState | null>(null)
-  const [tab, setTab] = useState<Tab>('queue')
-  const [selected, setSelected] = useState<string | null>(null)
+  const nav = useHistory<Place>(
+    () => ({ tab: 'queue', selected: null, part: storedClaudePart(), skill: null }),
+    samePlace,
+  )
+  const { tab, selected, part: claudePart, skill: openSkill } = nav.place
+  const swipeEdge = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Which page the settings window opens on: the selector's button goes straight to Espaces
   const [settingsView, setSettingsView] = useState<'main' | 'workspaces'>('main')
@@ -179,7 +200,8 @@ export function App() {
   const [pulls, setPulls] = useState<MyPulls | null>(null)
   const [pullsLoading, setPullsLoading] = useState(false)
   const [jobs, setJobs] = useState<JobBoard | null>(null)
-  const [claudePart, setClaudePart] = useState<ClaudePart>(storedClaudePart)
+
+  useEffect(() => saveMark(CLAUDE_PART_KEY, claudePart), [claudePart])
 
   // GitHub answers from a cache of a couple of minutes unless forced
   const loadPulls = (force: boolean) => {
@@ -210,7 +232,7 @@ export function App() {
   const switchWorkspace = (id: string) => {
     if (id === (switching ?? state?.workspace)) return
     setSwitching(id)
-    setSelected(null)
+    nav.replace({ selected: null })
     window.flux.saveSettings({ workspace: id }).catch(error => {
       setSwitching(null)
       showToast(`Changement d’espace impossible : ${(error as Error).message}`, 'error')
@@ -260,7 +282,7 @@ export function App() {
   useEffect(
     () =>
       window.flux.onOpenTopic(id => {
-        setSelected(id)
+        nav.go({ selected: id })
         setSettingsOpen(false)
       }),
     [],
@@ -286,22 +308,31 @@ export function App() {
     }
     setSettingsOpen(false)
     setSearchOpen(false)
-    setTab(target.tab)
-    setSelected(target.selected)
+    nav.go({ tab: target.tab, selected: target.selected })
   }, [link, state])
 
+  // The onboarding takes the whole window: no search nor settings waiting behind it
+  const onboardingNow = useRef(onboarding)
+  onboardingNow.current = onboarding
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (onboardingNow.current) return
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
         setSearchOpen(open => !open)
+      }
+      // The Mac's shortcut for an app's settings
+      if (event.metaKey && event.key === ',') {
+        event.preventDefault()
+        setSettingsView('main')
+        setSettingsOpen(true)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  useEffect(() => window.flux.onOpenDaily(() => setTab('daily')), [])
+  useEffect(() => window.flux.onOpenDaily(() => nav.go({ tab: 'daily' })), [])
 
   // Jobs come from Flux itself: read once, then each change as it happens
   useEffect(() => {
@@ -316,7 +347,7 @@ export function App() {
   useEffect(
     () =>
       window.flux.onOpenWrapup(() => {
-        setTab('wrapup')
+        nav.go({ tab: 'wrapup' })
         setSettingsOpen(false)
       }),
     [],
@@ -325,7 +356,7 @@ export function App() {
   useEffect(() => {
     if (!state || !selected) return
     const owner = tabFor(state, selected, tab)
-    if (owner && owner !== tab) setTab(owner)
+    if (owner && owner !== tab) nav.replace({ tab: owner })
   }, [selected, state === null])
 
   // Each sync asks again, so the count in the bar stays current
@@ -381,18 +412,33 @@ export function App() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement
-      if (['INPUT', 'TEXTAREA'].includes(target.tagName) || sheet || settingsOpen || searchOpen) return
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || sheet || hasLayer()) return
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      if (event.metaKey || event.altKey || event.ctrlKey) return
       const index = order.indexOf(currentId ?? '')
       const next = order[index + (event.key === 'ArrowRight' ? 1 : -1)]
       if (next) {
         event.preventDefault()
-        setSelected(next)
+        // Walking the list is not a move to come back to
+        nav.replace({ selected: next })
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [order, currentId, sheet, settingsOpen, searchOpen])
+  }, [order, currentId, sheet])
+
+  // A move keeps the topic shown, not "the first of the list", which changes with each sync
+  const goTo = (patch: Partial<Place>) => {
+    if (!sheet && selected === null && currentId) nav.replace({ selected: currentId })
+    nav.go(patch)
+  }
+
+  useBackForward({
+    back: nav.back,
+    forward: nav.forward,
+    can: direction => (direction === 'back' ? nav.canBack : nav.canForward),
+    edge: swipeEdge,
+  })
 
   // Same slot in both trees, so the scene keeps playing while the app appears underneath
   const bootScene =
@@ -463,19 +509,15 @@ export function App() {
   const unreadDaily = state.daily.status === 'ready' && readDate !== state.daily.date
   const unreadWrapup = wrapupMark !== null && readSlot !== wrapupMark
   const dayTabs = isDay(tab) ? (
-    <DayTabs tab={tab} unread={{ daily: unreadDaily, wrapup: unreadWrapup }} onPick={setTab} />
+    <DayTabs tab={tab} unread={{ daily: unreadDaily, wrapup: unreadWrapup }} onPick={page => goTo({ tab: page })} />
   ) : null
   const index = list.findIndex(view => view.topic.id === currentId)
   const position = (tab === 'queue' || tab === 'unstarted') && index >= 0 ? `${index + 1} sur ${list.length}` : null
-  const openTopic = (id: string) => {
-    setSelected(id)
-    setTab(tabFor(state, id) ?? 'queue')
-  }
+  const openTopic = (id: string) => goTo({ selected: id, tab: tabFor(state, id) ?? 'queue' })
   const pick = (result: SearchResult) => {
     setSearchOpen(false)
     setSettingsOpen(false)
-    setTab(result.tab)
-    setSelected(result.kind === 'page' ? null : result.id)
+    goTo({ tab: result.tab, selected: result.kind === 'page' ? null : result.id })
   }
   // A dated line at the end of the topic's note
   const addNote = (id: string, text: string) => {
@@ -514,8 +556,7 @@ export function App() {
             current={tab}
             unread={{ daily: unreadDaily, wrapup: unreadWrapup }}
             onPick={key => {
-              setTab(key === 'daily' ? day : key)
-              setSelected(null)
+              goTo({ tab: key === 'daily' ? day : key, selected: null })
               setSettingsOpen(false)
             }}
           />
@@ -603,7 +644,7 @@ export function App() {
               type="button"
               className="round glass"
               aria-label="Réglages"
-              title="Réglages"
+              title="Réglages · ⌘,"
               onClick={() => {
                 setSettingsView('main')
                 setSettingsOpen(open => !open)
@@ -625,11 +666,10 @@ export function App() {
             jobs={jobs}
             daily={state.daily}
             part={claudePart}
-            onPart={part => {
-              setClaudePart(part)
-              saveMark(CLAUDE_PART_KEY, part)
-            }}
-            onOpenDay={setTab}
+            skill={openSkill}
+            onPart={part => goTo({ part, skill: part === 'skills' ? null : openSkill })}
+            onSkill={(skill, part) => goTo({ skill, part: part ?? claudePart })}
+            onOpenDay={page => goTo({ tab: page })}
             onToast={(message, kind) => showToast(message, kind === 'error' ? 'error' : 'ok')}
           />
         ) : (
@@ -662,7 +702,7 @@ export function App() {
               grouping={tab === 'queue' || tab === 'unstarted' ? 'rank' : tab === 'waiting' ? 'owner' : 'none'}
               selected={currentId}
               isFresh={isFresh}
-              onSelect={setSelected}
+              onSelect={id => goTo({ selected: id })}
             />
           </>
         )}
@@ -686,6 +726,10 @@ export function App() {
         )}
 
         {toast && <Toast key={toast.id} toast={toast} onDone={() => setToast(null)} />}
+
+        <div className="swipe-edge" ref={swipeEdge} aria-hidden="true">
+          <ArrowLeft size={18} />
+        </div>
 
         <svg className="filters" aria-hidden="true">
           <filter id="lens" x="-10%" y="-10%" width="120%" height="120%">

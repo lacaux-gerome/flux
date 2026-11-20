@@ -496,6 +496,8 @@ export interface FluxApi {
   // Ticks or unticks a wrap-up line: a free task closes, a closed topic reopens
   checkWrapup(id: string, done: boolean): Promise<void>
   onRefreshShortcut(listener: () => void): () => void
+  // The system's swipe between pages
+  onNavigate(listener: (direction: 'back' | 'forward') => void): () => void
   refresh(): Promise<void>
   createNote(text: string): Promise<void>
   openCapture(): Promise<void>

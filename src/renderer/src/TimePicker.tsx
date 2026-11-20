@@ -1,5 +1,6 @@
 import { Check, ChevronDown, Clock } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayer } from './layers'
 
 const MENU_CLOSE_MS = 120
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
@@ -63,6 +64,7 @@ export function TimePicker({ value, onChange }: { value: string; onChange(value:
   // The menu stays mounted for the length of its closing animation
   const [mounted, setMounted] = useState(false)
   const root = useRef<HTMLDivElement>(null)
+  useLayer(open, () => setOpen(false), { root })
   const [hour, minute] = parse(value)
   // A time saved off the 5-minute grid stays choosable
   const minutes = MINUTES.includes(minute) ? MINUTES : [...MINUTES, minute].sort((a, b) => a - b)
@@ -96,12 +98,6 @@ export function TimePicker({ value, onChange }: { value: string; onChange(value:
     <div
       className="time-picker"
       ref={root}
-      onKeyDown={event => {
-        if (event.key === 'Escape' && open) {
-          event.stopPropagation()
-          setOpen(false)
-        }
-      }}
     >
       <button
         type="button"

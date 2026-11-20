@@ -4,6 +4,7 @@ import type { AppState } from '../../shared/types'
 import { LinkIcon } from './Brand'
 import { refLabel } from './format'
 import { searchFlux, showMenu, TAB_LABEL, type SearchResult } from './navigation'
+import { useLayer } from './layers'
 import { rankStyle, tint } from './rankStyle'
 
 interface SearchProps {
@@ -42,6 +43,8 @@ export function Search({ state, onPick, onClose }: SearchProps) {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const list = useRef<HTMLUListElement>(null)
+  const root = useRef<HTMLDivElement>(null)
+  useLayer(true, onClose, { root })
   const results = useMemo(() => searchFlux(state, query), [state, query])
 
   useEffect(() => setActive(0), [query])
@@ -58,15 +61,13 @@ export function Search({ state, onPick, onClose }: SearchProps) {
       event.preventDefault()
       const result = results[active]
       if (result) onPick(result)
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
     }
   }
 
   return (
     <div className="scrim search-scrim" onClick={onClose}>
       <div
+        ref={root}
         className="search glass"
         role="dialog"
         aria-modal="true"

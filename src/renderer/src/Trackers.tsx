@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useLayer } from './layers'
 import { CALENDARS, type CalendarName } from '../../shared/calendars'
 import { TRACKERS, type TrackerInfo, type TrackerName } from '../../shared/trackers'
 
@@ -69,6 +70,7 @@ function AddMenu<Name extends BadgeName>({
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const root = useRef<HTMLDivElement>(null)
+  useLayer(open, () => setOpen(false), { root })
 
   useEffect(() => {
     if (open) {
@@ -94,12 +96,6 @@ function AddMenu<Name extends BadgeName>({
     <div
       className="tracker-add"
       ref={root}
-      onKeyDown={event => {
-        if (event.key === 'Escape' && open) {
-          event.stopPropagation()
-          setOpen(false)
-        }
-      }}
     >
       <button
         type="button"

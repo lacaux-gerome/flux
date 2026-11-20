@@ -36,6 +36,8 @@ import type { DailySheet } from '../../shared/types'
 import { waitingFor } from './format'
 import { SkillPicker } from './SkillPicker'
 import { readMark, saveMark } from './storage'
+import { DialogForm } from './Dialog'
+import { useLayer } from './layers'
 import { TimePicker } from './TimePicker'
 
 const DAY_LETTER = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
@@ -203,6 +205,8 @@ function JobEditor({
   const [problem, setProblem] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  // Escape disarms before it closes the editor
+  useLayer(confirming, () => setConfirming(false))
   const nameField = useRef<HTMLInputElement>(null)
   const now = new Date()
   const draft: JobDraft = { ...form, skill: mode === 'skill' ? skill : null }
@@ -291,291 +295,281 @@ function JobEditor({
   }
 
   return (
-    <div className="scrim" onClick={onClose}>
-      <form
-        className="settings glass-dark job-editor"
-        aria-label={view ? `Modifier ${view.job.name}` : 'Nouvelle tâche'}
-        onSubmit={event => void submit(event)}
-        onClick={event => event.stopPropagation()}
-        onKeyDown={event => {
-          if (event.key === 'Escape') onClose()
-        }}
-      >
-        <header>
-          <h1>{view ? view.job.name : 'Nouvelle tâche'}</h1>
-          <div className="job-editor-head">
-            <label className="job-switch" title={form.enabled ? 'Mettre en pause' : 'Réactiver'}>
-              <input
-                type="checkbox"
-                role="switch"
-                checked={form.enabled}
-                onChange={event => set({ enabled: event.target.checked })}
-              />
-              {form.enabled ? 'Actif' : 'En pause'}
-            </label>
-            <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
-              <X size={16} aria-hidden="true" />
-            </button>
-          </div>
-        </header>
-
-        {keptAt && dirty && (
-          <p className="job-kept" role="status">
-            Brouillon repris, laissé il y a {waitingFor(keptAt)}.
-            <button type="button" onClick={drop}>
-              Effacer
-            </button>
-          </p>
-        )}
-
-        <label>
-          Nom
-          <input
-            ref={nameField}
-            className="job-input"
-            value={form.name}
-            placeholder="Revue du matin"
-            onChange={event => set({ name: event.target.value })}
-          />
-        </label>
-
-        <div className="field">
-          <span>Action</span>
-          <div className="job-choice" role="group" aria-label="Action">
-            <button type="button" className="time-preset" aria-pressed={mode === 'prompt'} onClick={() => setMode('prompt')}>
-              Un prompt
-            </button>
-            <button type="button" className="time-preset" aria-pressed={mode === 'skill'} onClick={() => setMode('skill')}>
-              Une skill
-            </button>
-          </div>
-          {mode === 'skill' && (
-            <>
-              <SkillPicker value={skill} skills={board.skills} onChange={pickSkill} />
-              {chosenSkill?.description && <small>{chosenSkill.description}</small>}
-            </>
-          )}
-          <textarea
-            className="job-input"
-            rows={mode === 'skill' ? 2 : 5}
-            value={form.prompt}
-            aria-label={mode === 'skill' ? 'Arguments de la skill' : 'Prompt'}
-            placeholder={
-              mode === 'skill' ? 'Arguments, si la skill en prend' : 'Fais le point sur mes PR ouvertes et poste-le dans Slack…'
-            }
-            onChange={event => set({ prompt: event.target.value })}
-          />
-          <small>Chaque exécution part de zéro : le prompt doit se suffire à lui-même.</small>
+    <DialogForm className="job-editor" label={view ? `Modifier ${view.job.name}` : 'Nouvelle tâche'} onClose={onClose} onSubmit={event => void submit(event)}>
+      <header>
+        <h1>{view ? view.job.name : 'Nouvelle tâche'}</h1>
+        <div className="job-editor-head">
+          <label className="job-switch" title={form.enabled ? 'Mettre en pause' : 'Réactiver'}>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={form.enabled}
+              onChange={event => set({ enabled: event.target.checked })}
+            />
+            {form.enabled ? 'Actif' : 'En pause'}
+          </label>
+          <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
+            <X size={16} aria-hidden="true" />
+          </button>
         </div>
+      </header>
 
-        <div className="field">
-          <span>Récurrence</span>
-          <div className="job-choice three" role="group" aria-label="Récurrence">
-            {REPEATS.map(entry => (
+      {keptAt && dirty && (
+        <p className="job-kept" role="status">
+          Brouillon repris, laissé il y a {waitingFor(keptAt)}.
+          <button type="button" onClick={drop}>
+            Effacer
+          </button>
+        </p>
+      )}
+
+      <label>
+        Nom
+        <input
+          ref={nameField}
+          className="job-input"
+          value={form.name}
+          placeholder="Revue du matin"
+          onChange={event => set({ name: event.target.value })}
+        />
+      </label>
+
+      <div className="field">
+        <span>Action</span>
+        <div className="job-choice" role="group" aria-label="Action">
+          <button type="button" className="time-preset" aria-pressed={mode === 'prompt'} onClick={() => setMode('prompt')}>
+            Un prompt
+          </button>
+          <button type="button" className="time-preset" aria-pressed={mode === 'skill'} onClick={() => setMode('skill')}>
+            Une skill
+          </button>
+        </div>
+        {mode === 'skill' && (
+          <>
+            <SkillPicker value={skill} skills={board.skills} onChange={pickSkill} />
+            {chosenSkill?.description && <small>{chosenSkill.description}</small>}
+          </>
+        )}
+        <textarea
+          className="job-input"
+          rows={mode === 'skill' ? 2 : 5}
+          value={form.prompt}
+          aria-label={mode === 'skill' ? 'Arguments de la skill' : 'Prompt'}
+          placeholder={
+            mode === 'skill' ? 'Arguments, si la skill en prend' : 'Fais le point sur mes PR ouvertes et poste-le dans Slack…'
+          }
+          onChange={event => set({ prompt: event.target.value })}
+        />
+        <small>Chaque exécution part de zéro : le prompt doit se suffire à lui-même.</small>
+      </div>
+
+      <div className="field">
+        <span>Récurrence</span>
+        <div className="job-choice three" role="group" aria-label="Récurrence">
+          {REPEATS.map(entry => (
+            <button
+              type="button"
+              key={entry.key}
+              className="time-preset"
+              aria-pressed={form.schedule.repeat === entry.key}
+              onClick={() => setSchedule({ repeat: entry.key })}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+        {form.schedule.repeat === 'daily' && (
+          <div className="job-when">
+            <div className="job-days" role="group" aria-label="Jours">
+              {WEEK_ORDER.map(day => (
+                <button
+                  type="button"
+                  key={day}
+                  className="time-preset"
+                  title={DAY_NAME[day]}
+                  aria-label={DAY_NAME[day]}
+                  aria-pressed={form.schedule.days.includes(day)}
+                  onClick={() =>
+                    setSchedule({
+                      days: form.schedule.days.includes(day)
+                        ? form.schedule.days.filter(entry => entry !== day)
+                        : [...form.schedule.days, day],
+                    })
+                  }
+                >
+                  {DAY_LETTER[day]}
+                </button>
+              ))}
+            </div>
+            <TimePicker value={form.schedule.time} onChange={time => setSchedule({ time })} />
+          </div>
+        )}
+        {form.schedule.repeat === 'hourly' && (
+          <div className="job-choice four" role="group" aria-label="Minute">
+            {MINUTES.map(minute => (
               <button
                 type="button"
-                key={entry.key}
+                key={minute}
                 className="time-preset"
-                aria-pressed={form.schedule.repeat === entry.key}
-                onClick={() => setSchedule({ repeat: entry.key })}
+                aria-pressed={parseTime(form.schedule.time)[1] === minute}
+                onClick={() => setSchedule({ time: `00:${pad(minute)}` })}
               >
-                {entry.label}
+                :{pad(minute)}
               </button>
             ))}
           </div>
-          {form.schedule.repeat === 'daily' && (
-            <div className="job-when">
-              <div className="job-days" role="group" aria-label="Jours">
-                {WEEK_ORDER.map(day => (
-                  <button
-                    type="button"
-                    key={day}
-                    className="time-preset"
-                    title={DAY_NAME[day]}
-                    aria-label={DAY_NAME[day]}
-                    aria-pressed={form.schedule.days.includes(day)}
-                    onClick={() =>
-                      setSchedule({
-                        days: form.schedule.days.includes(day)
-                          ? form.schedule.days.filter(entry => entry !== day)
-                          : [...form.schedule.days, day],
-                      })
-                    }
-                  >
-                    {DAY_LETTER[day]}
-                  </button>
-                ))}
-              </div>
-              <TimePicker value={form.schedule.time} onChange={time => setSchedule({ time })} />
-            </div>
-          )}
-          {form.schedule.repeat === 'hourly' && (
-            <div className="job-choice four" role="group" aria-label="Minute">
-              {MINUTES.map(minute => (
-                <button
-                  type="button"
-                  key={minute}
-                  className="time-preset"
-                  aria-pressed={parseTime(form.schedule.time)[1] === minute}
-                  onClick={() => setSchedule({ time: `00:${pad(minute)}` })}
-                >
-                  :{pad(minute)}
-                </button>
-              ))}
-            </div>
-          )}
-          <small>
-            {form.schedule.repeat === 'manual'
-              ? 'Seulement quand tu le lances, d’ici ou de la liste.'
-              : `${describeSchedule(form.schedule)}. Flux doit être ouvert ; un passage manqué de moins de 12 h part à l’ouverture.`}
-          </small>
-        </div>
+        )}
+        <small>
+          {form.schedule.repeat === 'manual'
+            ? 'Seulement quand tu le lances, d’ici ou de la liste.'
+            : `${describeSchedule(form.schedule)}. Flux doit être ouvert ; un passage manqué de moins de 12 h part à l’ouverture.`}
+        </small>
+      </div>
 
+      <div className="field">
+        <span className="job-field-head">
+          MCP autorisés
+          <button
+            type="button"
+            className="round glass small"
+            aria-label="Relire les MCP"
+            title="Relire les MCP"
+            disabled={board.mcpsLoading}
+            onClick={() => void window.flux.refreshMcps().catch(error => onError((error as Error).message))}
+          >
+            <RefreshCw size={13} className={board.mcpsLoading ? 'spin' : undefined} aria-hidden="true" />
+          </button>
+        </span>
+        {servers.length === 0 ? (
+          <small>{board.mcpsLoading ? 'Lecture des MCP de Claude…' : 'Aucun MCP déclaré dans Claude.'}</small>
+        ) : (
+          <div className="job-mcps" role="group" aria-label="MCP autorisés">
+            {servers.map(server => (
+              <button
+                type="button"
+                key={server.name}
+                className={`job-mcp ${server.status}`}
+                aria-pressed={form.mcps.includes(server.name)}
+                title={`${server.name} · ${MCP_STATUS[server.status]}`}
+                onClick={() => {
+                  set({
+                    mcps: form.mcps.includes(server.name)
+                      ? form.mcps.filter(name => name !== server.name)
+                      : [...form.mcps, server.name],
+                  })
+                  setAuto(current => current.filter(name => name !== server.name))
+                }}
+              >
+                <span className="job-mcp-dot" aria-hidden="true" />
+                {mcpLabel(server.name)}
+              </button>
+            ))}
+          </div>
+        )}
+        <small>
+          {form.mcps.length === 0
+            ? 'Aucun coché : la tâche tourne sans MCP.'
+            : mode === 'skill' && auto.length > 0
+              ? `${auto.map(mcpLabel).join(', ')} : coché${auto.length > 1 ? 's' : ''} parce que /${skill.trim().replace(/^\//, '')} s’en sert. Les MCP non cochés sont refusés.`
+              : 'La tâche n’a accès qu’aux MCP cochés, les autres lui sont refusés.'}
+        </small>
+      </div>
+
+      <div className="settings-row job-row-fields">
         <div className="field">
-          <span className="job-field-head">
-            MCP autorisés
+          <span>Dossier</span>
+          <div className="job-folder">
+            <input
+              className="job-input"
+              value={form.cwd}
+              spellCheck={false}
+              aria-label="Dossier"
+              onChange={event => set({ cwd: event.target.value })}
+            />
             <button
               type="button"
               className="round glass small"
-              aria-label="Relire les MCP"
-              title="Relire les MCP"
-              disabled={board.mcpsLoading}
-              onClick={() => void window.flux.refreshMcps().catch(error => onError((error as Error).message))}
+              aria-label="Choisir le dossier"
+              title="Choisir le dossier"
+              onClick={() =>
+                void window.flux.pickFolder(form.cwd).then(folder => folder && set({ cwd: folder }))
+              }
             >
-              <RefreshCw size={13} className={board.mcpsLoading ? 'spin' : undefined} aria-hidden="true" />
+              <FolderOpen size={14} aria-hidden="true" />
             </button>
-          </span>
-          {servers.length === 0 ? (
-            <small>{board.mcpsLoading ? 'Lecture des MCP de Claude…' : 'Aucun MCP déclaré dans Claude.'}</small>
-          ) : (
-            <div className="job-mcps" role="group" aria-label="MCP autorisés">
-              {servers.map(server => (
-                <button
-                  type="button"
-                  key={server.name}
-                  className={`job-mcp ${server.status}`}
-                  aria-pressed={form.mcps.includes(server.name)}
-                  title={`${server.name} · ${MCP_STATUS[server.status]}`}
-                  onClick={() => {
-                    set({
-                      mcps: form.mcps.includes(server.name)
-                        ? form.mcps.filter(name => name !== server.name)
-                        : [...form.mcps, server.name],
-                    })
-                    setAuto(current => current.filter(name => name !== server.name))
-                  }}
-                >
-                  <span className="job-mcp-dot" aria-hidden="true" />
-                  {mcpLabel(server.name)}
-                </button>
-              ))}
-            </div>
-          )}
-          <small>
-            {form.mcps.length === 0
-              ? 'Aucun coché : la tâche tourne sans MCP.'
-              : mode === 'skill' && auto.length > 0
-                ? `${auto.map(mcpLabel).join(', ')} : coché${auto.length > 1 ? 's' : ''} parce que /${skill.trim().replace(/^\//, '')} s’en sert. Les MCP non cochés sont refusés.`
-                : 'La tâche n’a accès qu’aux MCP cochés, les autres lui sont refusés.'}
-          </small>
-        </div>
-
-        <div className="settings-row job-row-fields">
-          <div className="field">
-            <span>Dossier</span>
-            <div className="job-folder">
-              <input
-                className="job-input"
-                value={form.cwd}
-                spellCheck={false}
-                aria-label="Dossier"
-                onChange={event => set({ cwd: event.target.value })}
-              />
-              <button
-                type="button"
-                className="round glass small"
-                aria-label="Choisir le dossier"
-                title="Choisir le dossier"
-                onClick={() =>
-                  void window.flux.pickFolder(form.cwd).then(folder => folder && set({ cwd: folder }))
-                }
-              >
-                <FolderOpen size={14} aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-          <div className="field">
-            <span>Permissions</span>
-            <div className="job-choice" role="group" aria-label="Permissions">
-              <button
-                type="button"
-                className="time-preset"
-                aria-pressed={form.permission === 'auto'}
-                title="Le mode auto de Claude juge chaque action"
-                onClick={() => set({ permission: 'auto' })}
-              >
-                Auto
-              </button>
-              <button
-                type="button"
-                className="time-preset"
-                aria-pressed={form.permission === 'strict'}
-                title="Seulement ce que tes réglages Claude autorisent déjà"
-                onClick={() => set({ permission: 'strict' })}
-              >
-                Strict
-              </button>
-            </div>
           </div>
         </div>
-
-        {live && (
-          <section className="field job-history">
-            <span className="job-field-head">
-              Dernières exécutions
-              <button
-                type="button"
-                className="pill glass small"
-                disabled={running(live)}
-                onClick={() =>
-                  void window.flux.runJob(live.job.id).catch(error => onError((error as Error).message))
-                }
-              >
-                <Play size={13} aria-hidden="true" />
-                Lancer maintenant
-              </button>
-            </span>
-            <Runs runs={live.runs} now={now} />
-          </section>
-        )}
-
-        {problem && (
-          <p className="job-problem" role="alert">
-            {problem}
-          </p>
-        )}
-
-        <footer>
-          {view && (
+        <div className="field">
+          <span>Permissions</span>
+          <div className="job-choice" role="group" aria-label="Permissions">
             <button
               type="button"
-              className={`pill small job-delete${confirming ? ' armed' : ' glass'}`}
-              onClick={() => void remove()}
-              onBlur={() => setConfirming(false)}
+              className="time-preset"
+              aria-pressed={form.permission === 'auto'}
+              title="Le mode auto de Claude juge chaque action"
+              onClick={() => set({ permission: 'auto' })}
             >
-              <Trash2 size={14} aria-hidden="true" />
-              {confirming ? `Supprimer « ${view.job.name} »` : 'Supprimer'}
+              Auto
             </button>
-          )}
-          <button type="button" className="pill glass small" onClick={cancel}>
-            Annuler
+            <button
+              type="button"
+              className="time-preset"
+              aria-pressed={form.permission === 'strict'}
+              title="Seulement ce que tes réglages Claude autorisent déjà"
+              onClick={() => set({ permission: 'strict' })}
+            >
+              Strict
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {live && (
+        <section className="field job-history">
+          <span className="job-field-head">
+            Dernières exécutions
+            <button
+              type="button"
+              className="pill glass small"
+              disabled={running(live)}
+              onClick={() =>
+                void window.flux.runJob(live.job.id).catch(error => onError((error as Error).message))
+              }
+            >
+              <Play size={13} aria-hidden="true" />
+              Lancer maintenant
+            </button>
+          </span>
+          <Runs runs={live.runs} now={now} />
+        </section>
+      )}
+
+      {problem && (
+        <p className="job-problem" role="alert">
+          {problem}
+        </p>
+      )}
+
+      <footer>
+        {view && (
+          <button
+            type="button"
+            className={`pill small job-delete${confirming ? ' armed' : ' glass'}`}
+            onClick={() => void remove()}
+            onBlur={() => setConfirming(false)}
+          >
+            <Trash2 size={14} aria-hidden="true" />
+            {confirming ? `Supprimer « ${view.job.name} »` : 'Supprimer'}
           </button>
-          <button type="submit" className="pill solid small" disabled={saving}>
-            {view ? 'Enregistrer' : 'Créer la tâche'}
-          </button>
-        </footer>
-      </form>
-    </div>
+        )}
+        <button type="button" className="pill glass small" onClick={cancel}>
+          Annuler
+        </button>
+        <button type="submit" className="pill solid small" disabled={saving}>
+          {view ? 'Enregistrer' : 'Créer la tâche'}
+        </button>
+      </footer>
+    </DialogForm>
   )
 }
 
@@ -694,66 +688,56 @@ function DailyEditor({
     }
   }
   return (
-    <div className="scrim" onClick={onClose}>
-      <form
-        className="settings glass-dark job-editor"
-        aria-label="Daily"
-        onSubmit={event => void save(event)}
-        onClick={event => event.stopPropagation()}
-        onKeyDown={event => {
-          if (event.key === 'Escape') onClose()
-        }}
-      >
-        <header>
-          <h1>Daily</h1>
-          <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </header>
-        <p className="job-note">
-          Flux lance lui-même <code>/{task.skill}</code> chaque jour ouvré, en lecture seule, et affiche le résultat dans
-          Journée. Ce n’est pas une tâche comme les autres : l’heure vit dans les réglages, la commande dans{' '}
-          <code>paths.dailyCommand</code>.
-        </p>
-        <div className="field">
-          <span>Heure</span>
-          <div className="job-when">
-            <TimePicker value={time} onChange={setTime} />
-          </div>
-          <small>Du lundi au vendredi. Flux doit être ouvert, et GitHub joignable.</small>
+    <DialogForm className="job-editor" label="Daily" onClose={onClose} onSubmit={event => void save(event)}>
+      <header>
+        <h1>Daily</h1>
+        <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
+        </button>
+      </header>
+      <p className="job-note">
+        Flux lance lui-même <code>/{task.skill}</code> chaque jour ouvré, en lecture seule, et affiche le résultat dans
+        Journée. Ce n’est pas une tâche comme les autres : l’heure vit dans les réglages, la commande dans{' '}
+        <code>paths.dailyCommand</code>.
+      </p>
+      <div className="field">
+        <span>Heure</span>
+        <div className="job-when">
+          <TimePicker value={time} onChange={setTime} />
         </div>
-        <section className="field job-history">
-          <span className="job-field-head">Derniers daily</span>
-          {task.runs.length === 0 ? (
-            <small>Aucun encore.</small>
-          ) : (
-            <ul className="job-runs">
-              {task.runs.map(entry => (
-                <li key={entry.date} className="job-run">
-                  <CircleCheck size={16} className="job-icon ok" aria-hidden="true" />
-                  <div className="job-run-main">
-                    <span className="job-run-when">
-                      {entry.at ? whenLabel(new Date(entry.at), now) : entry.date}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        <footer>
-          <button type="button" className="pill glass small" onClick={onOpenSkill}>
-            Voir le skill
-          </button>
-          <button type="button" className="pill glass small" onClick={onOpenDay}>
-            Ouvrir Journée
-          </button>
-          <button type="submit" className="pill solid small" disabled={saving || time === task.time}>
-            Enregistrer
-          </button>
-        </footer>
-      </form>
-    </div>
+        <small>Du lundi au vendredi. Flux doit être ouvert, et GitHub joignable.</small>
+      </div>
+      <section className="field job-history">
+        <span className="job-field-head">Derniers daily</span>
+        {task.runs.length === 0 ? (
+          <small>Aucun encore.</small>
+        ) : (
+          <ul className="job-runs">
+            {task.runs.map(entry => (
+              <li key={entry.date} className="job-run">
+                <CircleCheck size={16} className="job-icon ok" aria-hidden="true" />
+                <div className="job-run-main">
+                  <span className="job-run-when">
+                    {entry.at ? whenLabel(new Date(entry.at), now) : entry.date}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <footer>
+        <button type="button" className="pill glass small" onClick={onOpenSkill}>
+          Voir le skill
+        </button>
+        <button type="button" className="pill glass small" onClick={onOpenDay}>
+          Ouvrir Journée
+        </button>
+        <button type="submit" className="pill solid small" disabled={saving || time === task.time}>
+          Enregistrer
+        </button>
+      </footer>
+    </DialogForm>
   )
 }
 
@@ -851,68 +835,58 @@ function WrapupEditor({
     }
   }
   return (
-    <div className="scrim" onClick={onClose}>
-      <form
-        className="settings glass-dark job-editor"
-        aria-label="Wrap-up"
-        onSubmit={event => void save(event)}
-        onClick={event => event.stopPropagation()}
-        onKeyDown={event => {
-          if (event.key === 'Escape') onClose()
-        }}
-      >
-        <header>
-          <h1>Wrap-up</h1>
-          <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </header>
-        <p className="job-note">
-          Les jours ouvrés, une notification t’invite à cocher ce qui est fait et à choisir la suite. Pendant une
-          réunion, elle attend la fin. Ce n’est pas une session Claude : Flux s’en charge seul.
-        </p>
-        <div className="field">
-          <span>Relances</span>
-          <div className="settings-times">
-            {times.map((time, index) => (
-              <span className="time-slot" key={index}>
-                <TimePicker
-                  value={time}
-                  onChange={value => setTimes(times.map((entry, position) => (position === index ? value : entry)))}
-                />
-                <button
-                  type="button"
-                  className="round glass small"
-                  aria-label={`Retirer la relance de ${time}`}
-                  onClick={() => setTimes(times.filter((_, position) => position !== index))}
-                >
-                  <X size={13} aria-hidden="true" />
-                </button>
-              </span>
-            ))}
-            {times.length < 6 && (
-              <button type="button" className="pill glass small" onClick={() => setTimes([...times, nextTime(times)])}>
-                <Plus size={14} aria-hidden="true" />
-                Ajouter
+    <DialogForm className="job-editor" label="Wrap-up" onClose={onClose} onSubmit={event => void save(event)}>
+      <header>
+        <h1>Wrap-up</h1>
+        <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
+        </button>
+      </header>
+      <p className="job-note">
+        Les jours ouvrés, une notification t’invite à cocher ce qui est fait et à choisir la suite. Pendant une
+        réunion, elle attend la fin. Ce n’est pas une session Claude : Flux s’en charge seul.
+      </p>
+      <div className="field">
+        <span>Relances</span>
+        <div className="settings-times">
+          {times.map((time, index) => (
+            <span className="time-slot" key={index}>
+              <TimePicker
+                value={time}
+                onChange={value => setTimes(times.map((entry, position) => (position === index ? value : entry)))}
+              />
+              <button
+                type="button"
+                className="round glass small"
+                aria-label={`Retirer la relance de ${time}`}
+                onClick={() => setTimes(times.filter((_, position) => position !== index))}
+              >
+                <X size={13} aria-hidden="true" />
               </button>
-            )}
-          </div>
-          <small>Du lundi au vendredi. Flux doit être ouvert.</small>
+            </span>
+          ))}
+          {times.length < 6 && (
+            <button type="button" className="pill glass small" onClick={() => setTimes([...times, nextTime(times)])}>
+              <Plus size={14} aria-hidden="true" />
+              Ajouter
+            </button>
+          )}
         </div>
-        <footer>
-          <button type="button" className="pill glass small" onClick={onOpenWrapup}>
-            Ouvrir le wrap-up
-          </button>
-          <button
-            type="submit"
-            className="pill solid small"
-            disabled={saving || times.join() === task.times.join()}
-          >
-            Enregistrer
-          </button>
-        </footer>
-      </form>
-    </div>
+        <small>Du lundi au vendredi. Flux doit être ouvert.</small>
+      </div>
+      <footer>
+        <button type="button" className="pill glass small" onClick={onOpenWrapup}>
+          Ouvrir le wrap-up
+        </button>
+        <button
+          type="submit"
+          className="pill solid small"
+          disabled={saving || times.join() === task.times.join()}
+        >
+          Enregistrer
+        </button>
+      </footer>
+    </DialogForm>
   )
 }
 

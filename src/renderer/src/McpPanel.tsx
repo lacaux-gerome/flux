@@ -11,7 +11,9 @@ import {
   type McpTransport,
 } from '../../shared/claude'
 import { mcpLabel } from '../../shared/jobs'
+import { DialogForm } from './Dialog'
 import { waitingFor } from './format'
+import { useLayer } from './layers'
 
 const HEALTH_LABEL: Record<McpHealth, string> = {
   ok: 'connecté',
@@ -47,6 +49,10 @@ function metaOf(server: McpEntry, cwd: string): string {
   return parts.join(' · ')
 }
 
+// A form closed before adding opens again as it was left. In memory only: headers and variables
+// may hold a token
+let unsentDraft: McpDraft | null = null
+
 function blank(): McpDraft {
   return { name: '', transport: 'http', target: '', scope: 'user', env: '', headers: '' }
 }
@@ -60,10 +66,23 @@ function McpEditor({
   onClose(): void
   onAdded(name: string): void
 }) {
-  const [draft, setDraft] = useState<McpDraft>(blank)
+  const [draft, setDraft] = useState<McpDraft>(() => unsentDraft ?? blank())
+  const [restored, setRestored] = useState(unsentDraft !== null)
   const [problem, setProblem] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const nameField = useRef<HTMLInputElement>(null)
+  const latest = useRef(draft)
+  latest.current = draft
+  // Added, or let go with "Annuler": nothing to keep
+  const settled = useRef(false)
+
+  useEffect(
+    () => () => {
+      const left = latest.current
+      unsentDraft = settled.current || JSON.stringify(left) === JSON.stringify(blank()) ? null : left
+    },
+    [],
+  )
   const set = (patch: Partial<McpDraft>) => {
     setDraft(current => ({ ...current, ...patch }))
     setProblem(null)
@@ -84,6 +103,7 @@ function McpEditor({
     setSaving(true)
     try {
       await window.flux.addMcp(draft)
+      settled.current = true
       onAdded(draft.name.trim())
     } catch (error) {
       setProblem((error as Error).message)
@@ -93,119 +113,131 @@ function McpEditor({
   }
 
   return (
-    <div className="scrim" onClick={onClose}>
-      <form
-        className="settings glass-dark job-editor"
-        aria-label="Ajouter un MCP"
-        onSubmit={event => void submit(event)}
-        onClick={event => event.stopPropagation()}
-        onKeyDown={event => {
-          if (event.key === 'Escape') onClose()
-        }}
-      >
-        <header>
-          <h1>Ajouter un MCP</h1>
-          <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
-            <X size={16} aria-hidden="true" />
+    <DialogForm className="job-editor" label="Ajouter un MCP" onClose={onClose} onSubmit={event => void submit(event)}>
+      <header>
+        <h1>Ajouter un MCP</h1>
+        <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
+        </button>
+      </header>
+
+      {restored && (
+        <p className="job-kept" role="status">
+          Brouillon repris.
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(blank())
+              setRestored(false)
+            }}
+          >
+            Effacer
           </button>
-        </header>
+        </p>
+      )}
 
-        <label>
-          Nom
-          <input
-            ref={nameField}
-            className="job-input"
-            value={draft.name}
-            spellCheck={false}
-            placeholder="sentry"
-            onChange={event => set({ name: event.target.value })}
-          />
-        </label>
+      <label>
+        Nom
+        <input
+          ref={nameField}
+          className="job-input"
+          value={draft.name}
+          spellCheck={false}
+          placeholder="sentry"
+          onChange={event => set({ name: event.target.value })}
+        />
+      </label>
 
-        <div className="field">
-          <span>Type</span>
-          <div className="job-choice three" role="group" aria-label="Type">
-            {TRANSPORTS.map(entry => (
-              <button
-                type="button"
-                key={entry.key}
-                className="time-preset"
-                aria-pressed={draft.transport === entry.key}
-                onClick={() => set({ transport: entry.key })}
-              >
-                {entry.label}
-              </button>
-            ))}
-          </div>
-          <input
-            className="job-input"
-            value={draft.target}
-            spellCheck={false}
-            aria-label={draft.transport === 'stdio' ? 'Commande' : 'URL'}
-            placeholder={draft.transport === 'stdio' ? 'npx -y @acme/mcp-server --flag' : 'https://mcp.exemple.com/mcp'}
-            onChange={event => set({ target: event.target.value })}
-          />
-          <small>
-            {draft.transport === 'stdio'
-              ? 'La commande qui lance le serveur, avec ses arguments.'
-              : 'Si le serveur demande une connexion, « Reconnecter » ouvrira ton navigateur.'}
-          </small>
-        </div>
-
-        <div className="field">
-          <span>Portée</span>
-          <div className="job-choice" role="group" aria-label="Portée">
-            <button type="button" className="time-preset" aria-pressed={draft.scope === 'user'} onClick={() => set({ scope: 'user' })}>
-              Tous tes projets
+      <div className="field">
+        <span>Type</span>
+        <div className="job-choice three" role="group" aria-label="Type">
+          {TRANSPORTS.map(entry => (
+            <button
+              type="button"
+              key={entry.key}
+              className="time-preset"
+              aria-pressed={draft.transport === entry.key}
+              onClick={() => set({ transport: entry.key })}
+            >
+              {entry.label}
             </button>
-            <button type="button" className="time-preset" aria-pressed={draft.scope === 'local'} onClick={() => set({ scope: 'local' })}>
-              {home(board.cwd)} seulement
-            </button>
-          </div>
+          ))}
         </div>
+        <input
+          className="job-input"
+          value={draft.target}
+          spellCheck={false}
+          aria-label={draft.transport === 'stdio' ? 'Commande' : 'URL'}
+          placeholder={draft.transport === 'stdio' ? 'npx -y @acme/mcp-server --flag' : 'https://mcp.exemple.com/mcp'}
+          onChange={event => set({ target: event.target.value })}
+        />
+        <small>
+          {draft.transport === 'stdio'
+            ? 'La commande qui lance le serveur, avec ses arguments.'
+            : 'Si le serveur demande une connexion, « Reconnecter » ouvrira ton navigateur.'}
+        </small>
+      </div>
 
-        {draft.transport !== 'stdio' && (
-          <label>
-            En-têtes
-            <textarea
-              className="job-input"
-              rows={2}
-              value={draft.headers}
-              spellCheck={false}
-              placeholder="Authorization: Bearer …"
-              onChange={event => set({ headers: event.target.value })}
-            />
-          </label>
-        )}
+      <div className="field">
+        <span>Portée</span>
+        <div className="job-choice" role="group" aria-label="Portée">
+          <button type="button" className="time-preset" aria-pressed={draft.scope === 'user'} onClick={() => set({ scope: 'user' })}>
+            Tous tes projets
+          </button>
+          <button type="button" className="time-preset" aria-pressed={draft.scope === 'local'} onClick={() => set({ scope: 'local' })}>
+            {home(board.cwd)} seulement
+          </button>
+        </div>
+      </div>
 
+      {draft.transport !== 'stdio' && (
         <label>
-          Variables d’environnement
+          En-têtes
           <textarea
             className="job-input"
             rows={2}
-            value={draft.env}
+            value={draft.headers}
             spellCheck={false}
-            placeholder="API_KEY=…"
-            onChange={event => set({ env: event.target.value })}
+            placeholder="Authorization: Bearer …"
+            onChange={event => set({ headers: event.target.value })}
           />
         </label>
+      )}
 
-        {problem && (
-          <p className="job-problem" role="alert">
-            {problem}
-          </p>
-        )}
+      <label>
+        Variables d’environnement
+        <textarea
+          className="job-input"
+          rows={2}
+          value={draft.env}
+          spellCheck={false}
+          placeholder="API_KEY=…"
+          onChange={event => set({ env: event.target.value })}
+        />
+      </label>
 
-        <footer>
-          <button type="button" className="pill glass small" onClick={onClose}>
-            Annuler
-          </button>
-          <button type="submit" className="pill solid small" disabled={saving}>
-            {saving ? 'Ajout…' : 'Ajouter le MCP'}
-          </button>
-        </footer>
-      </form>
-    </div>
+      {problem && (
+        <p className="job-problem" role="alert">
+          {problem}
+        </p>
+      )}
+
+      <footer>
+        <button
+          type="button"
+          className="pill glass small"
+          onClick={() => {
+            settled.current = true
+            onClose()
+          }}
+        >
+          Annuler
+        </button>
+        <button type="submit" className="pill solid small" disabled={saving}>
+          {saving ? 'Ajout…' : 'Ajouter le MCP'}
+        </button>
+      </footer>
+    </DialogForm>
   )
 }
 
@@ -220,6 +252,8 @@ function McpRow({
 }) {
   const [busy, setBusy] = useState<'reconnect' | 'remove' | null>(null)
   const [confirming, setConfirming] = useState(false)
+  // Escape disarms before anything else closes
+  useLayer(confirming, () => setConfirming(false))
   const canRemove = removable(server)
 
   const reconnect = async () => {

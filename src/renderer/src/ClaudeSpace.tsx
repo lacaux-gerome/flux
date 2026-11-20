@@ -19,20 +19,24 @@ export function ClaudeSpace({
   jobs,
   daily,
   part,
+  skill: openSkill,
   onPart,
+  onSkill,
   onOpenDay,
   onToast,
 }: {
   jobs: JobBoard | null
   daily: DailySheet
   part: ClaudePart
+  // The skill open, if any
+  skill: string | null
   onPart(part: ClaudePart): void
+  onSkill(id: string | null, part?: ClaudePart): void
   onOpenDay(page: 'daily' | 'wrapup'): void
   onToast(message: string, kind?: 'error'): void
 }) {
   const [skills, setSkills] = useState<SkillBoard | null>(null)
   const [mcps, setMcps] = useState<McpBoard | null>(null)
-  const [openSkill, setOpenSkill] = useState<string | null>(null)
   const fail = (error: unknown) => onToast((error as Error).message, 'error')
 
   useEffect(() => window.flux.onSkills(setSkills), [])
@@ -55,10 +59,7 @@ export function ClaudeSpace({
               type="button"
               key={entry.key}
               aria-current={part === entry.key ? 'page' : undefined}
-              onClick={() => {
-                onPart(entry.key)
-                if (entry.key === 'skills') setOpenSkill(null)
-              }}
+              onClick={() => onPart(entry.key)}
             >
               {entry.label}
             </button>
@@ -66,7 +67,7 @@ export function ClaudeSpace({
         </nav>
 
         {part === 'skills' ? (
-          <SkillsPanel board={skills} openId={openSkill} onOpen={setOpenSkill} onToast={onToast} />
+          <SkillsPanel board={skills} openId={openSkill} onOpen={id => onSkill(id)} onToast={onToast} />
         ) : part === 'mcp' ? (
           <McpPanel board={mcps} onToast={onToast} />
         ) : (
@@ -75,8 +76,7 @@ export function ClaudeSpace({
             daily={daily}
             onOpenSkill={name => {
               const found = skills?.skills.find(skill => skill.name === name)
-              setOpenSkill(found?.id ?? `command:${name}`)
-              onPart('skills')
+              onSkill(found?.id ?? `command:${name}`, 'skills')
             }}
             onOpenDay={onOpenDay}
             onToast={onToast}

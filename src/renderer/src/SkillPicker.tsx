@@ -1,5 +1,6 @@
 import { Check, ChevronDown } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
+import { useLayer } from './layers'
 import { matchSkills, type SkillOption } from '../../shared/jobs'
 
 const MENU_CLOSE_MS = 100
@@ -24,6 +25,8 @@ export function SkillPicker({
   const [active, setActive] = useState(0)
   const root = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLUListElement>(null)
+  // Escape closes the menu, not the form around it
+  useLayer(open, () => setOpen(false), { root })
   const id = useId()
   const shown = matchSkills(skills, query)
   const optionId = (index: number) => `${id}-option-${index}`
@@ -91,10 +94,6 @@ export function SkillPicker({
           } else if (event.key === 'Enter' && open && shown[active]) {
             event.preventDefault()
             choose(shown[active])
-          } else if (event.key === 'Escape' && open) {
-            // Closes the menu, not the form around it
-            event.stopPropagation()
-            setOpen(false)
           } else if (event.key === 'Tab') {
             setOpen(false)
           }

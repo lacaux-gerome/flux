@@ -44,6 +44,11 @@ const api: FluxApi = {
     ipcRenderer.on('flux:refresh-shortcut', handler)
     return () => ipcRenderer.removeListener('flux:refresh-shortcut', handler)
   },
+  onNavigate(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, direction: 'back' | 'forward') => listener(direction)
+    ipcRenderer.on('flux:navigate', handler)
+    return () => ipcRenderer.removeListener('flux:navigate', handler)
+  },
   refresh: () => ipcRenderer.invoke('flux:refresh'),
   createNote: text => ipcRenderer.invoke('flux:create-note', text),
   openCapture: () => ipcRenderer.invoke('flux:open-capture'),
