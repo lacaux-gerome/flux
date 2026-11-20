@@ -27,8 +27,13 @@ export function useSlidingThumb(current: string | null, deps: DependencyList = [
       }))
     }
     place(true)
-    // Fonts loading, a count changing or the window narrowing move the buttons: follow without sliding
-    const observer = new ResizeObserver(() => place(false))
+    // Fonts loading, a count changing or the window narrowing move the buttons: follow without sliding.
+    // The observer reports every button once as it starts, which would cut the slide short
+    let started = false
+    const observer = new ResizeObserver(() => {
+      if (started) place(false)
+      started = true
+    })
     buttons.current.forEach(button => observer.observe(button))
     return () => observer.disconnect()
   }, [current, ...deps])
