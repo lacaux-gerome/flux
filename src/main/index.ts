@@ -446,6 +446,7 @@ function registerIpc(): void {
   ipcMain.handle('flux:skill-version', (_event, id: string, n: number) => skills.version(id, n))
   ipcMain.handle('flux:validate-skill', (_event, id: string) => skills.validate(id))
   ipcMain.handle('flux:edit-skill', (_event, id: string) => skills.edit(id))
+  ipcMain.handle('flux:remove-skill', (_event, id: string) => skills.remove(id))
   ipcMain.handle('flux:mcp-servers', () => mcps.snapshot())
   ipcMain.handle('flux:check-mcp-servers', () => mcps.refresh())
   ipcMain.handle('flux:reconnect-mcp', (_event, name: string) => mcps.reconnect(name))
@@ -496,6 +497,7 @@ function startClaudeSpace(): void {
     versions: new SkillVersions(SKILL_VERSIONS_DIR),
     transcripts: new TranscriptUsage(CLAUDE_PROJECTS_DIR, SKILL_USAGE_FILE),
     openSession: (prompt, folders) => openInDesktop(newSessionUrl(prompt, folders)),
+    trash: path => shell.trashItem(path),
     onChange: board => broadcast('flux:skills-board', board),
   })
   mcps = new McpManager({

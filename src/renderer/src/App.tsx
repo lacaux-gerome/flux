@@ -669,6 +669,10 @@ export function App() {
             skill={openSkill}
             onPart={part => goTo({ part, skill: part === 'skills' ? null : openSkill })}
             onSkill={(skill, part) => goTo({ skill, part: part ?? claudePart })}
+            onSkillRemoved={id => {
+              nav.replace({ skill: null })
+              nav.forget(place => place.skill === id)
+            }}
             onOpenDay={page => goTo({ tab: page })}
             onToast={(message, kind) => showToast(message, kind === 'error' ? 'error' : 'ok')}
           />

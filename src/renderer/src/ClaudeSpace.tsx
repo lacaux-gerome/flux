@@ -22,6 +22,7 @@ export function ClaudeSpace({
   skill: openSkill,
   onPart,
   onSkill,
+  onSkillRemoved,
   onOpenDay,
   onToast,
 }: {
@@ -32,6 +33,7 @@ export function ClaudeSpace({
   skill: string | null
   onPart(part: ClaudePart): void
   onSkill(id: string | null, part?: ClaudePart): void
+  onSkillRemoved(id: string): void
   onOpenDay(page: 'daily' | 'wrapup'): void
   onToast(message: string, kind?: 'error'): void
 }) {
@@ -67,7 +69,7 @@ export function ClaudeSpace({
         </nav>
 
         {part === 'skills' ? (
-          <SkillsPanel board={skills} openId={openSkill} onOpen={id => onSkill(id)} onToast={onToast} />
+          <SkillsPanel board={skills} openId={openSkill} onOpen={id => onSkill(id)} onRemoved={onSkillRemoved} onToast={onToast} />
         ) : part === 'mcp' ? (
           <McpPanel board={mcps} onToast={onToast} />
         ) : (

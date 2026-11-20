@@ -556,6 +556,8 @@ export interface FluxApi {
   validateSkill(id: string): Promise<SkillDetail>
   // Opens a Claude Desktop session that edits the skill with you
   editSkill(id: string): Promise<void>
+  // Sends a skill of yours to the Trash
+  removeSkill(id: string): Promise<void>
   // The last list of MCP servers; a new one is checked behind once it is old
   mcpServers(): Promise<McpBoard>
   onMcpServers(listener: (board: McpBoard) => void): () => void

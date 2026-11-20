@@ -1,7 +1,8 @@
-import { ArrowLeft, BadgeCheck, LoaderCircle, Lock, PenLine, Puzzle, Search, Sparkles, SquareSlash } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, LoaderCircle, Lock, PenLine, Puzzle, Search, Sparkles, SquareSlash, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { SkillBoard, SkillDetail, SkillEntry, SkillSource } from '../../shared/claude'
 import { skillGraph } from '../../shared/skillGraph'
+import { ConfirmDialog } from './ConfirmDialog'
 import { waitingFor } from './format'
 import { Prose } from './Markdown'
 import { CallIcon, SkillGraph } from './SkillGraph'
@@ -56,10 +57,12 @@ type Pick = 'draft' | number
 function SkillDetailView({
   id,
   onBack,
+  onRemoved,
   onToast,
 }: {
   id: string
   onBack(): void
+  onRemoved(): void
   onToast(message: string, kind?: 'error'): void
 }) {
   const [detail, setDetail] = useState<SkillDetail | null>(null)
@@ -67,6 +70,7 @@ function SkillDetailView({
   const [frozen, setFrozen] = useState<Record<number, string>>({})
   const [view, setView] = useState<'graph' | 'text'>('graph')
   const [busy, setBusy] = useState(false)
+  const [removing, setRemoving] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -137,6 +141,20 @@ function SkillDetailView({
       .editSkill(skill.id)
       .then(() => onToast('Session ouverte dans Claude'))
       .catch(error => onToast((error as Error).message, 'error'))
+  // A skill is its folder, a command its file
+  const trashed = skill.source === 'skill' ? skill.file.replace(/\/SKILL\.md$/, '') : skill.file
+  const remove = async () => {
+    setBusy(true)
+    try {
+      await window.flux.removeSkill(skill.id)
+      onToast(`/${skill.name} mis à la corbeille`)
+      onRemoved()
+    } catch (error) {
+      onToast((error as Error).message, 'error')
+      setBusy(false)
+      setRemoving(false)
+    }
+  }
 
   return (
     <section className="skill-detail">
@@ -185,8 +203,36 @@ function SkillDetailView({
               Valider la v{(current ?? 0) + 1}
             </button>
           )}
+          {skill.editable && (
+            <button
+              type="button"
+              className="round small glass skill-remove"
+              aria-label="Supprimer le skill"
+              title="Supprimer le skill"
+              disabled={busy}
+              onClick={() => setRemoving(true)}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
+
+      {removing && (
+        <ConfirmDialog
+          title={`Supprimer /${skill.name} ?`}
+          action="Mettre à la corbeille"
+          busy={busy}
+          onConfirm={() => void remove()}
+          onCancel={() => setRemoving(false)}
+        >
+          <p>
+            {skill.source === 'skill' ? 'Son dossier part' : 'Son fichier part'} à la corbeille du Mac, d’où tu peux le
+            récupérer. Claude Code ne le chargera plus.
+          </p>
+          <code>{trashed}</code>
+        </ConfirmDialog>
+      )}
 
       <header className="skill-head">
         <h2>
@@ -237,16 +283,28 @@ export function SkillsPanel({
   board,
   openId,
   onOpen,
+  onRemoved,
   onToast,
 }: {
   board: SkillBoard | null
   openId: string | null
   onOpen(id: string | null): void
+  onRemoved(id: string): void
   onToast(message: string, kind?: 'error'): void
 }) {
   const [query, setQuery] = useState('')
   const [owner, setOwner] = useState<Owner>(storedOwner)
-  if (openId) return <SkillDetailView key={openId} id={openId} onBack={() => onOpen(null)} onToast={onToast} />
+  if (openId) {
+    return (
+      <SkillDetailView
+        key={openId}
+        id={openId}
+        onBack={() => onOpen(null)}
+        onRemoved={() => onRemoved(openId)}
+        onToast={onToast}
+      />
+    )
+  }
   if (!board) return <p className="skill-empty">Lecture des skills…</p>
 
   const needle = query.trim().toLowerCase()

@@ -100,6 +100,7 @@ const api: FluxApi = {
   skillVersion: (id, n) => ipcRenderer.invoke('flux:skill-version', id, n),
   validateSkill: id => ipcRenderer.invoke('flux:validate-skill', id),
   editSkill: id => ipcRenderer.invoke('flux:edit-skill', id),
+  removeSkill: id => ipcRenderer.invoke('flux:remove-skill', id),
   mcpServers: () => ipcRenderer.invoke('flux:mcp-servers'),
   onMcpServers(listener) {
     const handler = (_event: unknown, board: McpBoard) => listener(board)

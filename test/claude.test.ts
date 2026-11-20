@@ -1,4 +1,4 @@
-import { appendFile, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -287,11 +287,13 @@ describe('versions d’un skill', () => {
 
     const root = join(home, '.flux')
     const opened = vi.fn(async () => undefined)
+    const trashed = vi.fn((path: string) => rm(path, { recursive: true }))
     const library = new SkillLibrary({
       home,
       versions: new SkillVersions(join(root, 'skills')),
       transcripts: new TranscriptUsage(join(home, 'projects'), join(root, 'usage.json')),
       openSession: opened,
+      trash: trashed,
       onChange: () => undefined,
     })
     const board = await library.list()
@@ -317,6 +319,13 @@ describe('versions d’un skill', () => {
 
     await library.edit('command:gl_daily')
     expect(opened).toHaveBeenCalledWith(editPrompt({ name: 'gl_daily', file: join(claude, 'commands', 'gl_daily.md') }, 2), [join(claude, 'commands')])
+
+    // A skill goes to the Trash with its folder, a command alone; a plugin's stays
+    await library.remove('skill:design')
+    await library.remove('command:gl_commit')
+    expect(trashed.mock.calls.map(([path]) => path)).toEqual([join(claude, 'skills', 'design'), join(claude, 'commands', 'gl_commit.md')])
+    expect((await library.list()).skills.map(skill => skill.id).sort()).toEqual(['command:gl_daily', 'plugin:expo:expo-upgrade'])
+    await expect(library.remove('plugin:expo:expo-upgrade')).rejects.toThrow(/plugin/)
   })
 })
 

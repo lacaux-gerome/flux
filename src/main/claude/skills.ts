@@ -108,6 +108,8 @@ export interface SkillLibraryDeps {
   transcripts: TranscriptUsage
   // Opens a Claude Desktop session on these folders, with this prompt
   openSession(prompt: string, folders: string[]): Promise<void>
+  // Sends a file or a folder to the Trash
+  trash(path: string): Promise<void>
   onChange(board: SkillBoard): void
   now?: () => Date
 }
@@ -207,5 +209,13 @@ export class SkillLibrary {
     if (found.source === 'plugin') throw new Error('Un skill de plugin se met à jour avec son plugin.')
     const detail = await this.detail(id)
     await this.deps.openSession(editPrompt(found, detail.versions.at(-1)?.n ?? null), [dirname(found.file)])
+  }
+
+  // To the Trash, not erased: a skill's folder goes whole, with what it carries
+  async remove(id: string): Promise<void> {
+    const found = await this.find(id)
+    if (found.source === 'plugin') throw new Error('Un skill de plugin part avec son plugin.')
+    await this.deps.trash(found.source === 'skill' ? dirname(found.file) : found.file)
+    this.deps.onChange(await this.list())
   }
 }
