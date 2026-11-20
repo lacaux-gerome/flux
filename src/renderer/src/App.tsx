@@ -44,12 +44,14 @@ import { Search } from './Search'
 import { SettingsPanel } from './SettingsPanel'
 import { Toast, type ToastMessage } from './Toast'
 import { Stage } from './Stage'
+import { readMark, saveMark } from './storage'
 import { useSeen } from './useSeen'
 import { WrapupView } from './WrapupView'
 
 
 const DAILY_READ_KEY = 'flux.dailyRead'
 const WRAPUP_READ_KEY = 'flux.wrapupRead'
+const CLAUDE_PART_KEY = 'flux.claudePart'
 // The loading scene plays at least this long, then dissolves into the app
 const BOOT_MIN_MS = 1800
 const BOOT_EXIT_MS = 900
@@ -108,20 +110,10 @@ function emptyTitle(tab: ListTab, looseCount: number): string {
   return 'Rien ici pour le moment.'
 }
 
-function readMark(key: string): string | null {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-function saveMark(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    return
-  }
+// The part of the Claude space left open last time
+function storedClaudePart(): ClaudePart {
+  const part = readMark(CLAUDE_PART_KEY)
+  return part === 'mcp' || part === 'tasks' ? part : 'skills'
 }
 
 export function App() {
@@ -152,7 +144,7 @@ export function App() {
   const [pulls, setPulls] = useState<MyPulls | null>(null)
   const [pullsLoading, setPullsLoading] = useState(false)
   const [jobs, setJobs] = useState<JobBoard | null>(null)
-  const [claudePart, setClaudePart] = useState<ClaudePart>('skills')
+  const [claudePart, setClaudePart] = useState<ClaudePart>(storedClaudePart)
 
   // GitHub answers from a cache of a couple of minutes unless forced
   const loadPulls = (force: boolean) => {
@@ -634,7 +626,10 @@ export function App() {
             jobs={jobs}
             daily={state.daily}
             part={claudePart}
-            onPart={setClaudePart}
+            onPart={part => {
+              setClaudePart(part)
+              saveMark(CLAUDE_PART_KEY, part)
+            }}
             onOpenDay={() => setTab('daily')}
             onToast={(message, kind) => showToast(message, kind === 'error' ? 'error' : 'ok')}
           />

@@ -8,10 +8,10 @@ import { SkillsPanel } from './SkillsPanel'
 
 export type ClaudePart = 'skills' | 'mcp' | 'tasks'
 
-const PARTS: Array<{ key: ClaudePart; label: string; hint: string }> = [
-  { key: 'skills', label: 'Skills', hint: 'Tes skills Claude Code, du plus récemment lancé au plus ancien.' },
-  { key: 'mcp', label: 'MCP', hint: 'Les serveurs MCP que Claude Code charge, et leur état.' },
-  { key: 'tasks', label: 'Tâches', hint: 'Ce que Flux lance pour toi, à l’heure dite.' },
+const PARTS: Array<{ key: ClaudePart; label: string }> = [
+  { key: 'skills', label: 'Skills' },
+  { key: 'mcp', label: 'MCP' },
+  { key: 'tasks', label: 'Tâches' },
 ]
 
 // Skills, MCP servers and scheduled tasks: what Claude does for you, in one place
@@ -43,21 +43,12 @@ export function ClaudeSpace({
     if (part === 'mcp') void window.flux.mcpServers().then(setMcps).catch(fail)
   }, [part])
 
-  const hint = PARTS.find(entry => entry.key === part)?.hint
+  // An open skill takes the room its graph needs
   const wide = part === 'skills' && openSkill !== null
 
   return (
     <main className="page">
       <div className={`page-column claude-space${wide ? ' wide' : ''}`}>
-        {/* An open skill takes the room: its graph matters more than the page title */}
-        {!wide && (
-          <header className="daily-head">
-            <div>
-              <h1>Claude</h1>
-              <p>{hint}</p>
-            </div>
-          </header>
-        )}
         <nav className="tabs glass day-tabs" aria-label="Parties de Claude">
           {PARTS.map(entry => (
             <button

@@ -5887,11 +5887,51 @@ li.chosen .project-check {
   color: var(--text-3);
 }
 
-.skill-filters {
+.skills > .claude-toolbar {
+  justify-content: flex-start;
+  gap: 8px 14px;
+}
+
+/* Filters the list below: lighter than the parts above it, which change the page */
+.skill-owners {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 2px;
+}
+
+.skill-owners button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s var(--ease),
+    color 0.15s var(--ease);
+}
+
+.skill-owners button:hover {
+  color: var(--text);
+}
+
+.skill-owners button[aria-pressed='true'] {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+.skill-owners .count {
+  font-size: 12px;
+}
+
+.skill-scan {
+  margin-left: auto;
 }
 
 .skill-search input {
@@ -6602,13 +6642,27 @@ li.chosen .project-check {
   padding: 0 10px;
 }
 
+/* The owner filter, lighter than the parts: no glass, a faint pill on the chosen one */
 .w-subtabs.w-cl-seg {
   height: 30px;
+  background: none;
+  box-shadow: none;
 }
 
 .w-cl-seg .w-tab {
   height: 26px;
   font-size: 11.5px;
+}
+
+.w-cl-seg .w-tab-on {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.w-cl-seg .w-tab-on .w-count {
+  color: var(--text-3);
 }
 
 .w-cl-search {

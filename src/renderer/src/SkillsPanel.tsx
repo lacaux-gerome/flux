@@ -5,6 +5,7 @@ import { skillGraph } from '../../shared/skillGraph'
 import { waitingFor } from './format'
 import { Prose } from './Markdown'
 import { CallIcon, SkillGraph } from './SkillGraph'
+import { readMark, saveMark } from './storage'
 
 // While a skill is open, Flux looks again now and then for the edits made in Claude
 const DETAIL_POLL_MS = 4000
@@ -31,16 +32,23 @@ const day = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 
 // Yours live in ~/.claude/skills and ~/.claude/commands; the others come with a plugin
-type Owner = 'all' | 'mine' | 'external'
+type Owner = 'all' | 'mine' | 'plugin'
 
 const OWNERS: Array<{ key: Owner; label: string; hint?: string }> = [
   { key: 'all', label: 'Tous' },
   { key: 'mine', label: 'Mes skills', hint: 'Dans ~/.claude/skills et ~/.claude/commands' },
-  { key: 'external', label: 'Extérieurs', hint: 'Venus avec un plugin' },
+  { key: 'plugin', label: 'Plugins', hint: 'Venus avec un plugin' },
 ]
 
+const OWNER_KEY = 'flux.skillOwner'
+
 const ownedBy = (skill: SkillEntry, owner: Owner) =>
-  owner === 'all' || (owner === 'external') === (skill.source === 'plugin')
+  owner === 'all' || (owner === 'plugin') === (skill.source === 'plugin')
+
+function storedOwner(): Owner {
+  const owner = readMark(OWNER_KEY)
+  return owner === 'mine' || owner === 'plugin' ? owner : 'all'
+}
 
 // 'draft' is the file as Claude loads it; a number is a validated version
 type Pick = 'draft' | number
@@ -237,7 +245,7 @@ export function SkillsPanel({
   onToast(message: string, kind?: 'error'): void
 }) {
   const [query, setQuery] = useState('')
-  const [owner, setOwner] = useState<Owner>('all')
+  const [owner, setOwner] = useState<Owner>(storedOwner)
   if (openId) return <SkillDetailView key={openId} id={openId} onBack={() => onOpen(null)} onToast={onToast} />
   if (!board) return <p className="skill-empty">Lecture des skills…</p>
 
@@ -250,41 +258,38 @@ export function SkillsPanel({
   return (
     <section className="skills">
       <div className="claude-toolbar">
-        <div className="skill-filters">
-          <label className="skill-search glass">
-            <Search size={14} aria-hidden="true" />
-            <input
-              value={query}
-              placeholder="Chercher un skill"
-              aria-label="Chercher un skill"
-              spellCheck={false}
-              onChange={event => setQuery(event.target.value)}
-            />
-          </label>
-          <nav className="tabs glass day-tabs skill-views" aria-label="Provenance des skills">
-            {OWNERS.map(entry => (
-              <button
-                type="button"
-                key={entry.key}
-                title={entry.hint}
-                aria-current={owner === entry.key ? 'page' : undefined}
-                onClick={() => setOwner(entry.key)}
-              >
-                {entry.label}
-                <span className="count">{board.skills.filter(skill => ownedBy(skill, entry.key)).length}</span>
-              </button>
-            ))}
-          </nav>
+        <label className="skill-search glass">
+          <Search size={14} aria-hidden="true" />
+          <input
+            value={query}
+            placeholder="Chercher un skill"
+            aria-label="Chercher un skill"
+            spellCheck={false}
+            onChange={event => setQuery(event.target.value)}
+          />
+        </label>
+        <div className="skill-owners" role="group" aria-label="Provenance des skills">
+          {OWNERS.map(entry => (
+            <button
+              type="button"
+              key={entry.key}
+              title={entry.hint}
+              aria-pressed={owner === entry.key}
+              onClick={() => {
+                setOwner(entry.key)
+                saveMark(OWNER_KEY, entry.key)
+              }}
+            >
+              {entry.label}
+              <span className="count">{board.skills.filter(skill => ownedBy(skill, entry.key)).length}</span>
+            </button>
+          ))}
         </div>
-        <small>
-          {owned.length} skills, du plus récemment lancé au plus ancien
-          {board.scanning && (
-            <>
-              {' · '}
-              <LoaderCircle size={12} className="spin" aria-hidden="true" /> lecture des transcripts
-            </>
-          )}
-        </small>
+        {board.scanning && (
+          <small className="skill-scan">
+            <LoaderCircle size={12} className="spin" aria-hidden="true" /> lecture des transcripts
+          </small>
+        )}
       </div>
       {shown.length === 0 ? (
         <p className="skill-empty">Aucun skill ne correspond.</p>

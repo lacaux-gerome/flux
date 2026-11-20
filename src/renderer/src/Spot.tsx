@@ -1453,8 +1453,8 @@ const CL = {
 
 // Where the cursor goes, in the window
 const CL_AT = {
-  mine: [388, 201],
-  skill: [400, 442],
+  mine: [388, 145],
+  skill: [400, 386],
   grab: [756, 518],
   drop: [56, 518],
   edit: [825, 140],
@@ -1462,27 +1462,28 @@ const CL_AT = {
   version: [648, 140],
   older: [640, 200],
   mcpPart: [151, 97],
-  connect: [733, 298],
-  add: [726, 201],
+  connect: [733, 242],
+  add: [726, 145],
   name: [480, 149],
   url: [480, 241],
   addSave: [636, 506],
-  trash: [765, 394],
-  confirm: [705, 394],
-  tasksPart: [323, 157],
-  newTask: [727, 201],
+  trash: [765, 338],
+  confirm: [705, 338],
+  tasksPart: [323, 101],
+  newTask: [727, 145],
   title: [480, 149],
   prompt: [480, 248],
   sentry: [362, 400],
   linear: [296, 400],
   create: [639, 546],
-  play: [766, 346],
-  row: [420, 346],
+  play: [766, 290],
+  row: [420, 290],
   session: [671, 278],
 } satisfies Record<string, [number, number]>
 
-// The list rows, one under the other from the toolbar down
-const slotTop = (slot: number) => 228 + 48 * slot
+// The toolbar of a list, under the parts, then its rows one under the other
+const TOOLBAR_TOP = 130
+const slotTop = (slot: number) => 172 + 48 * slot
 // The graph scrolls this far left when dragged
 const PAN_X = -700
 
@@ -1593,17 +1594,9 @@ function Parts({ left, top, on }: { left: number; top: number; on: Partial<Recor
   return <Pills items={items} style={pos(left, top)} />
 }
 
-// The top of the tab while no skill is open: its name, what the part shows, the three parts
-function ClaudeTop({ hint, on }: { hint: string; on: Partial<Record<Part, Range[]>> }) {
-  return (
-    <>
-      <span className="w-sheet-titles" style={pos(170, 84)}>
-        <b>Claude</b>
-        <small>{hint}</small>
-      </span>
-      <Parts left={170} top={140} on={on} />
-    </>
-  )
+// The top of the tab while no skill is open: the three parts, the tab itself names the page
+function ClaudeTop({ on }: { on: Partial<Record<Part, Range[]>> }) {
+  return <Parts left={170} top={84} on={on} />
 }
 
 // A button the cursor presses, at a place of the window
@@ -1783,24 +1776,16 @@ function SkillsList() {
   const owners: Array<[ReactNode, number, Range[]]> = [
     [<>Tous<span className="w-count">67</span></>, 52, [[0, CL.FILTER]]],
     [<>Mes skills<span className="w-count">11</span></>, 84, [[CL.FILTER, 99]]],
-    [<>Extérieurs<span className="w-count">56</span></>, 84, []],
+    [<>Plugins<span className="w-count">56</span></>, 74, []],
   ]
   return (
     <div className="w-layer w-span" style={span(CL.PAGE + 0.1, CL.OPEN + 0.1)}>
-      <ClaudeTop hint="Tes skills Claude Code, du plus récemment lancé au plus ancien." on={{ Skills: [[0, 99]] }} />
-      <span className="w-cl-search" style={pos(170, 186)}>
+      <ClaudeTop on={{ Skills: [[0, 99]] }} />
+      <span className="w-cl-search" style={pos(170, TOOLBAR_TOP)}>
         <Search size={12} />
         Chercher un skill
       </span>
-      <Pills items={owners} className="w-cl-seg" style={pos(292, 186)} />
-      <span className="w-cl-note" style={{ top: 194, right: 170 }}>
-        <Ticker
-          values={[
-            [0, '67 skills, du plus récemment lancé au plus ancien'],
-            [CL.FILTER + 0.1, '11 skills, du plus récemment lancé au plus ancien'],
-          ]}
-        />
-      </span>
+      <Pills items={owners} className="w-cl-seg" style={pos(292, TOOLBAR_TOP)} />
       <SkillRows />
     </div>
   )
@@ -2319,11 +2304,8 @@ const checked = (index: number) => CL.MCP + 0.9 + 0.25 * index
 function McpPart() {
   return (
     <div className="w-layer w-span" style={span(CL.MCP + 0.2, CL.TASKS + 0.1)}>
-      <ClaudeTop
-        hint="Les serveurs MCP que Claude Code charge, et leur état."
-        on={{ MCP: [[0, CL.TASKS]], Tâches: [[CL.TASKS, 99]] }}
-      />
-      <span className="w-cl-note" style={pos(170, 194)}>
+      <ClaudeTop on={{ MCP: [[0, CL.TASKS]], Tâches: [[CL.TASKS, 99]] }} />
+      <span className="w-cl-note" style={pos(170, TOOLBAR_TOP + 8)}>
         <Ticker
           values={[
             [
@@ -2337,11 +2319,11 @@ function McpPart() {
           ]}
         />
       </span>
-      <Press left={550} top={186} width={106}>
+      <Press left={550} top={TOOLBAR_TOP} width={106}>
         <RefreshCw size={11} />
         Tout vérifier
       </Press>
-      <Press left={662} top={186} at={CL.ADD} className="solid" width={128}>
+      <Press left={662} top={TOOLBAR_TOP} at={CL.ADD} className="solid" width={128}>
         <Plus size={12} />
         Ajouter un MCP
       </Press>
@@ -2627,8 +2609,8 @@ function TaskRuns() {
 function TasksPart() {
   return (
     <div className="w-layer w-in" style={d(CL.TASKS + 0.2)}>
-      <ClaudeTop hint="Ce que Flux lance pour toi, à l’heure dite." on={{ Tâches: [[0, 99]] }} />
-      <span className="w-cl-note" style={pos(170, 194)}>
+      <ClaudeTop on={{ Tâches: [[0, 99]] }} />
+      <span className="w-cl-note" style={pos(170, TOOLBAR_TOP + 8)}>
         <Ticker
           values={[
             [0, '2 tâches · prochain : Daily, demain 9:30'],
@@ -2636,7 +2618,7 @@ function TasksPart() {
           ]}
         />
       </span>
-      <Press left={664} top={186} at={CL.NEW} className="solid" width={126}>
+      <Press left={664} top={TOOLBAR_TOP} at={CL.NEW} className="solid" width={126}>
         <Plus size={12} />
         Nouvelle tâche
       </Press>
@@ -3183,8 +3165,8 @@ export const SCENES: Scene[] = [
       [0.6, 600, 240],
       [CL.TAB - 0.1, TAB_X['Claude'], TAB_Y],
       [CL.TAB + 0.4, TAB_X['Claude'], TAB_Y],
-      [2.4, 560, 168],
-      [4.3, 560, 168],
+      [2.4, 560, 112],
+      [4.3, 560, 112],
       [CL.FILTER - 0.1, ...CL_AT.mine],
       [CL.FILTER + 0.5, ...CL_AT.mine],
       [CL.OPEN - 0.1, ...CL_AT.skill],
@@ -3210,12 +3192,12 @@ export const SCENES: Scene[] = [
       [23.6, 720, 300],
       [CL.MCP - 0.1, ...CL_AT.mcpPart],
       [CL.MCP + 0.4, ...CL_AT.mcpPart],
-      [25.2, 560, 168],
-      [27.1, 560, 168],
+      [25.2, 560, 112],
+      [27.1, 560, 112],
       [CL.AUTH - 0.1, ...CL_AT.connect],
       [CL.AUTH + 0.4, ...CL_AT.connect],
-      [29.2, 620, 168],
-      [30.5, 620, 168],
+      [29.2, 620, 112],
+      [30.5, 620, 112],
       [CL.ADD - 0.1, ...CL_AT.add],
       [CL.ADD + 0.3, ...CL_AT.add],
       [CL.NAME - 0.2, ...CL_AT.name],
@@ -3224,18 +3206,18 @@ export const SCENES: Scene[] = [
       [CL.URL + 0.8, ...CL_AT.url],
       [CL.ADDED - 0.1, ...CL_AT.addSave],
       [CL.ADDED + 0.3, ...CL_AT.addSave],
-      [34.9, 600, 168],
-      [35.9, 600, 168],
+      [34.9, 600, 112],
+      [35.9, 600, 112],
       [CL.TRASH - 0.1, ...CL_AT.trash],
       [CL.TRASH + 0.2, ...CL_AT.trash],
       [CL.REMOVE - 0.1, ...CL_AT.confirm],
       [CL.REMOVE + 0.3, ...CL_AT.confirm],
-      [38.2, 560, 168],
-      [38.9, 560, 168],
+      [38.2, 560, 112],
+      [38.9, 560, 112],
       [CL.TASKS - 0.1, ...CL_AT.tasksPart],
       [CL.TASKS + 0.3, ...CL_AT.tasksPart],
-      [40.3, 560, 168],
-      [41.6, 560, 168],
+      [40.3, 560, 112],
+      [41.6, 560, 112],
       [CL.NEW - 0.1, ...CL_AT.newTask],
       [CL.NEW + 0.3, ...CL_AT.newTask],
       [CL.TITLE - 0.2, ...CL_AT.title],
@@ -3248,8 +3230,8 @@ export const SCENES: Scene[] = [
       [CL.ALLOW + 0.7, ...CL_AT.linear],
       [CL.CREATE - 0.1, ...CL_AT.create],
       [CL.CREATE + 0.3, ...CL_AT.create],
-      [48.4, 600, 168],
-      [48.7, 600, 168],
+      [48.4, 600, 112],
+      [48.7, 600, 112],
       [CL.RUN - 0.1, ...CL_AT.play],
       [CL.RUN + 0.4, ...CL_AT.play],
       [51.1, ...CL_AT.play],
@@ -3289,19 +3271,19 @@ export const SCENES: Scene[] = [
     ],
     focus: [
       tabFocus('Claude', 0.6, CL.TAB + 0.3),
-      [2.9, 4.2, 688, 222, 100, 342, 14],
-      [4.5, CL.FILTER + 0.5, 288, 182, 236, 38, 19],
+      [2.9, 4.2, 688, 166, 100, 342, 14],
+      [4.5, CL.FILTER + 0.5, 288, 126, 226, 38, 19],
       [9.9, 11, 432, 328, 316, 134, 14],
       [CL.DRAFT + 0.7, CL.DRAFT + 1.8, 610, 439, 136, 69, 14],
       [CL.VALIDATE - 0.4, CL.VALIDATE + 0.3, 782, 121, 124, 38, 19],
       [CL.PICK + 0.5, CL.PICK + 1.7, 270, 209, 220, 28, 14],
       [23.6, CL.MCP + 0.2, 56, 76, 198, 42, 21],
-      [CL.AUTH - 0.5, CL.AUTHED + 0.8, 164, 270, 632, 56, 16],
-      [CL.ADD - 0.6, CL.ADD + 0.1, 658, 182, 136, 38, 19],
-      [CL.TRASH - 0.7, CL.REMOVE + 0.4, 164, 366, 632, 56, 16],
-      [CL.TASKS + 0.6, CL.NEW - 0.8, 164, 222, 632, 56, 16],
+      [CL.AUTH - 0.5, CL.AUTHED + 0.8, 164, 214, 632, 56, 16],
+      [CL.ADD - 0.6, CL.ADD + 0.1, 658, 126, 136, 38, 19],
+      [CL.TRASH - 0.7, CL.REMOVE + 0.4, 164, 310, 632, 56, 16],
+      [CL.TASKS + 0.6, CL.NEW - 0.8, 164, 166, 632, 56, 16],
       [CL.ALLOW - 0.3, CL.ALLOW + 0.9, 256, 380, 448, 88, 14],
-      [CL.RUN - 0.4, CL.RAN + 0.3, 164, 318, 632, 56, 16],
+      [CL.RUN - 0.4, CL.RAN + 0.3, 164, 262, 632, 56, 16],
       [CL.SESSION - 0.5, CL.SESSION + 0.2, 258, 249, 444, 58, 14],
     ],
     Picture: ClaudePicture,
