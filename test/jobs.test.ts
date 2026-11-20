@@ -11,6 +11,7 @@ import {
   matchSkills,
   mcpLabel,
   nextRun,
+  nextWrapup,
   serversFor,
   whenLabel,
   type Job,
@@ -53,6 +54,15 @@ describe('horaires des jobs', () => {
     expect(dueSlot(WEEKDAYS, at(16, 10), at(17, 9, 1))).toEqual(at(17, 9))
     expect(dueSlot(WEEKDAYS, at(17, 9), at(17, 12))).toBeNull()
     expect(dueSlot(WEEKDAYS, at(20, 10), at(23, 11))).toEqual(at(23, 9))
+  })
+
+  it('trouve la prochaine relance du wrap-up, un jour ouvré', () => {
+    const times = ['11:00', '14:30', '16:30']
+    expect(nextWrapup(times, at(17, 12))).toEqual(at(17, 14, 30))
+    expect(nextWrapup(times, at(17, 17))).toEqual(at(18, 11))
+    // Friday evening: Monday morning
+    expect(nextWrapup(times, at(20, 17))).toEqual(at(23, 11))
+    expect(nextWrapup([], at(17, 12))).toBeNull()
   })
 
   it('dit la récurrence et le moment comme on les lit', () => {
@@ -187,6 +197,7 @@ describe('planificateur', () => {
       ]),
       listSkills: async () => [],
       daily: async () => null,
+      wrapup: () => ({ times: [], next: null }),
       defaultCwd: '/tmp',
       onChange: () => undefined,
       onFinish: vi.fn(),

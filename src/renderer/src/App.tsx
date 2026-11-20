@@ -630,7 +630,7 @@ export function App() {
               setClaudePart(part)
               saveMark(CLAUDE_PART_KEY, part)
             }}
-            onOpenDay={() => setTab('daily')}
+            onOpenDay={setTab}
             onToast={(message, kind) => showToast(message, kind === 'error' ? 'error' : 'ok')}
           />
         ) : (

@@ -27,7 +27,7 @@ export function ClaudeSpace({
   daily: DailySheet
   part: ClaudePart
   onPart(part: ClaudePart): void
-  onOpenDay(): void
+  onOpenDay(page: 'daily' | 'wrapup'): void
   onToast(message: string, kind?: 'error'): void
 }) {
   const [skills, setSkills] = useState<SkillBoard | null>(null)

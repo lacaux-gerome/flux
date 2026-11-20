@@ -86,9 +86,17 @@ export interface DailyTask {
   runs: Array<{ date: string; at: string | null }>
 }
 
+// Flux's wrap-up reminders: a notification each workday at these times, apart from the jobs too. The
+// times live in the settings (wrapupTimes)
+export interface WrapupTask {
+  times: string[]
+  next: string | null
+}
+
 export interface JobBoard {
   jobs: JobView[]
   daily: DailyTask | null
+  wrapup: WrapupTask
   mcps: McpServer[]
   // When Claude last said which servers it loads; null until it has
   mcpsAt: string | null
@@ -253,6 +261,12 @@ export function nextDaily(now: Date, time: string, doneToday: boolean, workdayEn
   if (workday && !doneToday && today <= now && now.getHours() < workdayEnd) return now
   if (workday && !doneToday && today > now) return today
   return nextRun(schedule, new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59))
+}
+
+// The next reminder of the wrap-up, on a workday; a meeting may still hold it back
+export function nextWrapup(times: string[], now: Date): Date | null {
+  const next = times.flatMap(time => nextRun({ repeat: 'daily', days: WEEKDAYS, time }, now) ?? [])
+  return next.sort((a, b) => a.getTime() - b.getTime())[0] ?? null
 }
 
 // What is missing before a draft can be saved, in the words of the form

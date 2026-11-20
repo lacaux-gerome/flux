@@ -19,6 +19,7 @@ import {
   Hand,
   Hourglass,
   KeyRound,
+  ListChecks,
   LoaderCircle,
   Lock,
   Maximize2,
@@ -1476,8 +1477,8 @@ const CL_AT = {
   sentry: [362, 400],
   linear: [296, 400],
   create: [639, 546],
-  play: [766, 290],
-  row: [420, 290],
+  play: [766, 338],
+  row: [420, 338],
   session: [671, 278],
 } satisfies Record<string, [number, number]>
 
@@ -1632,10 +1633,12 @@ function JobLine({
   meta,
   side,
   play,
+  action = <Play size={10} />,
   className,
   style,
 }: {
   icon: ReactNode
+  // As the row writes it: /gl_daily for a skill, flux_wrapup for Flux's own
   skill?: string
   name: string
   badge?: string
@@ -1643,6 +1646,7 @@ function JobLine({
   side: ReactNode
   // When the cursor presses its play button
   play?: number
+  action?: ReactNode
   className?: string
   style?: CSSProperties
 }) {
@@ -1651,7 +1655,7 @@ function JobLine({
       {icon}
       <span className="w-check-main">
         <b>
-          {skill && <span className="w-check-ref">/{skill}</span>}
+          {skill && <span className="w-check-ref">{skill}</span>}
           {name}
           {badge && <span className="w-cl-badge">{badge}</span>}
         </b>
@@ -1659,7 +1663,7 @@ function JobLine({
       </span>
       <span className="w-check-side">{side}</span>
       <span className={`w-job-play${play === undefined ? '' : ' w-press'}`} style={play === undefined ? undefined : d(play)}>
-        <Play size={10} />
+        {action}
       </span>
     </span>
   )
@@ -2613,8 +2617,8 @@ function TasksPart() {
       <span className="w-cl-note" style={pos(170, TOOLBAR_TOP + 8)}>
         <Ticker
           values={[
-            [0, '2 tâches · prochain : Daily, demain 9:30'],
-            [CL.CREATE + 0.4, '3 tâches · prochain : Point Sentry du matin, demain 9:30'],
+            [0, '3 tâches · prochain : Daily, demain 9:30'],
+            [CL.CREATE + 0.4, '4 tâches · prochain : Point Sentry du matin, demain 9:30'],
           ]}
         />
       </span>
@@ -2624,7 +2628,7 @@ function TasksPart() {
       </Press>
       <span className="w-cl-slot" style={pos(170, slotTop(0))}>
         <JobLine
-          skill="gl_daily"
+          skill="/gl_daily"
           name="Daily"
           badge="Flux"
           meta="Du lundi au vendredi à 9:30 · lancé par Flux, en lecture seule"
@@ -2636,15 +2640,28 @@ function TasksPart() {
       </span>
       <span className="w-cl-slot" style={pos(170, slotTop(1))}>
         <JobLine
+          skill="flux_wrapup"
+          name="Wrap-up"
+          badge="Flux"
+          meta="Du lundi au vendredi à 11:00, 14:30 et 16:30 · notification de Flux"
+          side="demain 11:00"
+          action={<ExternalLink size={10} />}
+          className="w-in"
+          style={d(CL.TASKS + 0.33)}
+          icon={<ListChecks size={15} className="w-ci" />}
+        />
+      </span>
+      <span className="w-cl-slot" style={pos(170, slotTop(2))}>
+        <JobLine
           name="Revue des PR ouvertes"
           meta="Chaque vendredi à 17:00 · 2 MCP"
           side="ven. 17:00"
           className="w-in"
-          style={d(CL.TASKS + 0.36)}
+          style={d(CL.TASKS + 0.39)}
           icon={<CircleCheck size={15} className="w-ci ok" />}
         />
       </span>
-      <span className="w-cl-slot" style={pos(170, slotTop(2))}>
+      <span className="w-cl-slot" style={pos(170, slotTop(3))}>
         <JobLine
           name="Point Sentry du matin"
           meta="Du lundi au vendredi à 9:30 · 2 MCP"
@@ -3119,7 +3136,7 @@ export const SCENES: Scene[] = [
       [CL.AUTH - 0.6, 'À connecter ? Un clic lance la connexion.'],
       [CL.ADD - 0.6, 'Ajoute un serveur : Flux passe par claude mcp add.'],
       [CL.TRASH - 0.8, 'Et retire ce qui ne sert plus, en deux clics.'],
-      [CL.TASKS - 0.6, 'Les tâches que Flux lance pour toi, le daily en tête.'],
+      [CL.TASKS - 0.6, 'Les tâches que Flux lance pour toi, daily et wrap-up en tête.'],
       [CL.NEW - 0.4, 'Une tâche : un prompt ou une skill, les jours, l’heure…'],
       [CL.ALLOW - 0.9, '…et les seuls MCP qu’elle a le droit d’utiliser.'],
       [CL.RUN - 0.6, 'À l’heure dite, ou d’un clic : Claude s’en charge.'],
@@ -3281,9 +3298,9 @@ export const SCENES: Scene[] = [
       [CL.AUTH - 0.5, CL.AUTHED + 0.8, 164, 214, 632, 56, 16],
       [CL.ADD - 0.6, CL.ADD + 0.1, 658, 126, 136, 38, 19],
       [CL.TRASH - 0.7, CL.REMOVE + 0.4, 164, 310, 632, 56, 16],
-      [CL.TASKS + 0.6, CL.NEW - 0.8, 164, 166, 632, 56, 16],
+      [CL.TASKS + 0.6, CL.NEW - 0.8, 164, 166, 632, 104, 16],
       [CL.ALLOW - 0.3, CL.ALLOW + 0.9, 256, 380, 448, 88, 14],
-      [CL.RUN - 0.4, CL.RAN + 0.3, 164, 262, 632, 56, 16],
+      [CL.RUN - 0.4, CL.RAN + 0.3, 164, 310, 632, 56, 16],
       [CL.SESSION - 0.5, CL.SESSION + 0.2, 258, 249, 444, 58, 14],
     ],
     Picture: ClaudePicture,

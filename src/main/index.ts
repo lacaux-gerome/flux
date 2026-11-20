@@ -18,7 +18,7 @@ import {
   type WebContents,
 } from 'electron'
 import type { McpDraft } from '../shared/claude'
-import type { JobDraft } from '../shared/jobs'
+import { nextWrapup, type JobDraft } from '../shared/jobs'
 import { FLUX_SCHEME, fluxLink, linkMenuEntries, parseFluxLink, type LinkMenu } from '../shared/links'
 import { PROFILE_LABEL, type ProfilesPatch } from '../shared/profiles'
 import type { AppState, ProjectOptions, ProposedAction, SettingsPatch, Topic } from '../shared/types'
@@ -411,6 +411,10 @@ function registerIpc(): void {
       return
     }
     registerCapture()
+    // The daily and the wrap-up show among the tasks, with the times just saved
+    if (patch.dailyTime !== undefined || patch.wrapupTimes !== undefined) {
+      void jobs.snapshot().then(board => broadcast('flux:jobs-board', board))
+    }
     // The panel closes as soon as settings are written; sources reload in the background
     void flux.reloadSources()
   })
@@ -487,6 +491,10 @@ function startJobs(): JobScheduler {
     listMcps: listMcpServers,
     listSkills: () => listSkills(),
     daily: () => dailyTask(new Date(), settings.values.dailyTime, settings.values.workdayEnd),
+    wrapup: () => {
+      const times = settings.values.wrapupTimes
+      return { times, next: nextWrapup(times, new Date())?.toISOString() ?? null }
+    },
     defaultCwd: defaultCwd(),
     onChange(board) {
       broadcast('flux:jobs-board', board)

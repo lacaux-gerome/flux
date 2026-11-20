@@ -19,6 +19,7 @@ import {
   type JobRun,
   type McpServer,
   type SkillOption,
+  type WrapupTask,
 } from '../../shared/jobs'
 import { claudeEnv } from '../llm/claude'
 import { BIN } from '../paths'
@@ -53,6 +54,8 @@ export interface JobDeps {
   listSkills(): Promise<SkillOption[]>
   // Flux's own daily, shown with the jobs though it runs apart
   daily(): Promise<DailyTask | null>
+  // Flux's wrap-up reminders, read from the settings each time
+  wrapup(): WrapupTask
   defaultCwd: string
   onChange(board: JobBoard): void
   onFinish(job: Job, run: JobRun): void
@@ -182,6 +185,7 @@ export class JobScheduler {
           .slice(0, RUNS_SHOWN),
       })),
       daily: this.daily,
+      wrapup: this.deps.wrapup(),
       mcps: this.state.mcps.servers,
       mcpsAt: this.state.mcps.at,
       mcpsLoading: this.mcpsLoading !== null,

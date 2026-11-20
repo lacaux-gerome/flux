@@ -4016,14 +4016,6 @@ button.ref-pill:hover {
   color: var(--waiting);
 }
 
-.settings-wrapup {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 13.5px;
-  font-weight: 500;
-}
-
 .settings-times {
   display: flex;
   flex-wrap: wrap;

@@ -5,6 +5,7 @@ import {
   CircleX,
   ExternalLink,
   FolderOpen,
+  ListChecks,
   LoaderCircle,
   Play,
   Plus,
@@ -28,6 +29,7 @@ import {
   type JobRepeat,
   type JobRun,
   type JobView,
+  type WrapupTask,
   type McpServer,
 } from '../../shared/jobs'
 import type { DailySheet } from '../../shared/types'
@@ -122,13 +124,14 @@ function metaOf(view: JobView): string {
 
 function subtitle(board: JobBoard | null, now: Date): string {
   if (!board) return 'Lecture des tâches…'
-  // The daily counts: it is a task too, only Flux's own
-  const total = board.jobs.length + (board.daily ? 1 : 0)
+  // The daily and the wrap-up count: they are tasks too, only Flux's own
+  const total = board.jobs.length + (board.daily ? 1 : 0) + (board.wrapup.times.length > 0 ? 1 : 0)
   if (total === 0) return 'Aucune tâche pour l’instant.'
   const count = `${total} tâche${total > 1 ? 's' : ''}`
   const next = [
     ...board.jobs.flatMap(view => (view.next ? [{ name: view.job.name, at: view.next }] : [])),
     ...(board.daily?.next ? [{ name: 'Daily', at: board.daily.next }] : []),
+    ...(board.wrapup.next ? [{ name: 'Wrap-up', at: board.wrapup.next }] : []),
   ].sort((a, b) => a.at.localeCompare(b.at))[0]
   if (!next) return count
   const at = new Date(next.at)
@@ -754,6 +757,165 @@ function DailyEditor({
   )
 }
 
+// 11:00, 14:30 et 16:30, as one says the reminders
+function timeList(times: string[]): string {
+  const clocks = times.map(time => time.replace(/^0(?=\d)/, ''))
+  return clocks.length > 1 ? `${clocks.slice(0, -1).join(', ')} et ${clocks.at(-1)}` : (clocks[0] ?? '')
+}
+
+// A new reminder lands an hour after the last one
+function nextTime(times: string[]): string {
+  const last = [...times].sort().at(-1)
+  if (!last) return '11:00'
+  const hours = Math.min(Number(last.slice(0, 2)) + 1, 23)
+  return `${String(hours).padStart(2, '0')}${last.slice(2)}`
+}
+
+function WrapupRow({
+  task,
+  now,
+  onOpenWrapup,
+  onToast,
+}: {
+  task: WrapupTask
+  now: Date
+  onOpenWrapup(): void
+  onToast(message: string, kind?: 'error'): void
+}) {
+  const [editing, setEditing] = useState(false)
+  const meta =
+    task.times.length === 0
+      ? 'Aucune relance pour l’instant'
+      : `Du lundi au vendredi à ${timeList(task.times)} · notification de Flux`
+
+  return (
+    <li className="check-row job-row">
+      <ListChecks size={16} className="job-icon" aria-hidden="true" />
+      <button type="button" className="check-main" title="Régler les relances" onClick={() => setEditing(true)}>
+        <span className="check-title">
+          <span className="check-ref">flux_wrapup</span>
+          Wrap-up
+          <span className="job-badge">Flux</span>
+        </span>
+        <span className="check-meta">{meta}</span>
+      </button>
+      <span className="check-side">{task.next ? whenLabel(new Date(task.next), now) : ''}</span>
+      <button
+        type="button"
+        className="round small glass"
+        aria-label="Ouvrir le wrap-up"
+        title="Ouvrir le wrap-up"
+        onClick={onOpenWrapup}
+      >
+        <ExternalLink size={13} aria-hidden="true" />
+      </button>
+      {editing && (
+        <WrapupEditor
+          task={task}
+          onClose={() => setEditing(false)}
+          onOpenWrapup={() => {
+            setEditing(false)
+            onOpenWrapup()
+          }}
+          onToast={onToast}
+        />
+      )}
+    </li>
+  )
+}
+
+function WrapupEditor({
+  task,
+  onClose,
+  onOpenWrapup,
+  onToast,
+}: {
+  task: WrapupTask
+  onClose(): void
+  onOpenWrapup(): void
+  onToast(message: string, kind?: 'error'): void
+}) {
+  const [times, setTimes] = useState(task.times)
+  const [saving, setSaving] = useState(false)
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setSaving(true)
+    try {
+      await window.flux.saveSettings({ wrapupTimes: times })
+      onToast(times.length === 0 ? 'Plus de relance du wrap-up' : `Wrap-up à ${timeList([...times].sort())}`)
+      onClose()
+    } catch (error) {
+      onToast((error as Error).message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <div className="scrim" onClick={onClose}>
+      <form
+        className="settings glass-dark job-editor"
+        aria-label="Wrap-up"
+        onSubmit={event => void save(event)}
+        onClick={event => event.stopPropagation()}
+        onKeyDown={event => {
+          if (event.key === 'Escape') onClose()
+        }}
+      >
+        <header>
+          <h1>Wrap-up</h1>
+          <button type="button" className="round glass small" aria-label="Fermer" onClick={onClose}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        </header>
+        <p className="job-note">
+          Les jours ouvrés, une notification t’invite à cocher ce qui est fait et à choisir la suite. Pendant une
+          réunion, elle attend la fin. Ce n’est pas une session Claude : Flux s’en charge seul.
+        </p>
+        <div className="field">
+          <span>Relances</span>
+          <div className="settings-times">
+            {times.map((time, index) => (
+              <span className="time-slot" key={index}>
+                <TimePicker
+                  value={time}
+                  onChange={value => setTimes(times.map((entry, position) => (position === index ? value : entry)))}
+                />
+                <button
+                  type="button"
+                  className="round glass small"
+                  aria-label={`Retirer la relance de ${time}`}
+                  onClick={() => setTimes(times.filter((_, position) => position !== index))}
+                >
+                  <X size={13} aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+            {times.length < 6 && (
+              <button type="button" className="pill glass small" onClick={() => setTimes([...times, nextTime(times)])}>
+                <Plus size={14} aria-hidden="true" />
+                Ajouter
+              </button>
+            )}
+          </div>
+          <small>Du lundi au vendredi. Flux doit être ouvert.</small>
+        </div>
+        <footer>
+          <button type="button" className="pill glass small" onClick={onOpenWrapup}>
+            Ouvrir le wrap-up
+          </button>
+          <button
+            type="submit"
+            className="pill solid small"
+            disabled={saving || times.join() === task.times.join()}
+          >
+            Enregistrer
+          </button>
+        </footer>
+      </form>
+    </div>
+  )
+}
+
 export function JobsPanel({
   board,
   daily,
@@ -764,7 +926,7 @@ export function JobsPanel({
   board: JobBoard | null
   daily: DailySheet
   onOpenSkill(name: string): void
-  onOpenDay(): void
+  onOpenDay(page: 'daily' | 'wrapup'): void
   onToast(message: string, kind?: 'error'): void
 }) {
   // null: closed; 'new': a blank task; else the id of the task edited
@@ -785,7 +947,7 @@ export function JobsPanel({
         </div>
       </div>
 
-      {board && (board.daily || board.jobs.length > 0) && (
+      {board && (
         <ul className="checklist">
           {board.daily && (
             <DailyRow
@@ -793,10 +955,11 @@ export function JobsPanel({
               sheet={daily}
               now={now}
               onOpenSkill={onOpenSkill}
-              onOpenDay={onOpenDay}
+              onOpenDay={() => onOpenDay('daily')}
               onToast={onToast}
             />
           )}
+          <WrapupRow task={board.wrapup} now={now} onOpenWrapup={() => onOpenDay('wrapup')} onToast={onToast} />
           {board.jobs.map(view => (
             <li key={view.job.id} className={`check-row job-row${view.job.enabled ? '' : ' paused'}`}>
               <RunIcon run={view.runs[0]} paused={!view.job.enabled && !running(view)} />

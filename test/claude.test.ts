@@ -350,6 +350,7 @@ describe('le daily parmi les tâches', () => {
       listMcps: async () => [],
       listSkills: async () => [],
       daily: async () => daily,
+      wrapup: () => ({ times: [], next: null }),
       defaultCwd: '/tmp',
       onChange: () => undefined,
       onFinish: () => undefined,
