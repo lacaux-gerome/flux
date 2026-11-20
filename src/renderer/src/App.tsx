@@ -8,7 +8,6 @@ import {
   Search as SearchIcon,
   Settings,
   TriangleAlert,
-  Waves,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseFluxLink } from '../../shared/links'
@@ -16,6 +15,7 @@ import type { JobBoard } from '../../shared/jobs'
 import type { AppState, MyPulls, Settings as FluxSettings, SourceName } from '../../shared/types'
 import { Boot, type BootProgress } from './Boot'
 import { BrandIcon } from './Brand'
+import { BrandMark } from './BrandMark'
 import { Changelog } from './Changelog'
 import { DailyView } from './DailyView'
 import { clock, until } from './format'
@@ -494,9 +494,7 @@ export function App() {
 
         <header className="topbar">
           <div className="brand">
-            <span className="brand-mark glass">
-              <Waves size={16} strokeWidth={2.4} aria-hidden="true" />
-            </span>
+            <BrandMark />
             <span className="brand-name">Flux</span>
             {state.workspaces.length > 1 && (
               <WorkspaceSwitch

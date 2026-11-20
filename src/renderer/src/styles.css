@@ -170,6 +170,29 @@ input {
   width: 30px;
   height: 30px;
   border-radius: 9px;
+  overflow: hidden;
+}
+
+/* The wave leaves on the right, then comes back from the left. brand-wave-in is listed first so that,
+   held on its first frame during its delay, it does not hide brand-wave-out */
+.brand-wave.waving {
+  animation:
+    brand-wave-in 200ms var(--ease) 150ms backwards,
+    brand-wave-out 150ms var(--ease-in);
+}
+
+@keyframes brand-wave-out {
+  to {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+
+@keyframes brand-wave-in {
+  from {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
 }
 
 .topbar > .tabs {
