@@ -18,7 +18,7 @@ const ENTRIES: Entry[] = [
     date: '20 nov.',
     name: 'Onglet Claude',
     text: 'Un onglet pour ce que Claude fait pour toi. Tes skills, du dernier lancé au plus ancien, chacun en graphe d’étapes et de MCP, avec ses versions à valider. Tes serveurs MCP et leur état, à reconnecter, ajouter ou retirer. Et les tâches que Flux lance à l’heure dite, le daily compris.',
-    scene: 'jobs',
+    scene: 'claude',
   },
   {
     id: '2026-11-16-decoupage',

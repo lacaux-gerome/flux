@@ -1,33 +1,53 @@
 import {
+  ArrowLeft,
   ArrowUpRight,
+  BadgeCheck,
   Bot,
   Check,
+  ChevronDown,
   ChevronsLeftRight,
+  CircleAlert,
   CircleCheck,
   CircleDashed,
   CircleX,
   Clock,
+  ExternalLink,
+  FileText,
   GitPullRequest,
   GitPullRequestDraft,
   GripVertical,
   Hand,
   Hourglass,
+  KeyRound,
   LoaderCircle,
+  Lock,
   Maximize2,
   MessagesSquare,
   Minimize2,
+  Minus,
   Pause,
+  PenLine,
   Play,
+  Plug,
   Plus,
+  Puzzle,
   RefreshCw,
   RotateCcw,
+  Scan,
+  Search,
   Settings as Gear,
   Sparkles,
+  SquareSlash,
+  SquareTerminal,
+  Trash2,
   UserRound,
   Waves,
+  X,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -1391,41 +1411,245 @@ function DayPicture() {
   )
 }
 
-/* Claude, tasks: the Claude jobs Flux runs, a prompt or a skill, each with the MCP servers it may use */
+/* Claude: what Claude does for you, in one tab. The skills, read as a graph and kept in versions;
+   the MCP servers Claude loads; the tasks Flux runs. One move at a time, each in its own light */
 
-const JB = { TAB: 1.4, PAGE: 1.7, NEW: 4.2, NAME: 5, PROMPT: 5.7, MCP: 8, SAVE: 10.6, RUN: 12.2, DONE: 14.2 }
-const JB_NEW: [number, number] = [732, 117]
-const JB_SENTRY: [number, number] = [297, 406]
-const JB_LINEAR: [number, number] = [363, 406]
-const JB_SAVE: [number, number] = [646, 463]
-const JB_PLAY: [number, number] = [766, 270]
-const JOBS: Array<{ skill?: string; name: string; meta: string; side: string }> = [
-  { skill: 'gl_daily', name: 'Daily du matin', meta: 'Du lundi au vendredi à 9:00 · 3 MCP', side: 'demain 9:00' },
-  { name: 'Revue des PR ouvertes', meta: 'Chaque vendredi à 17:00 · 2 MCP', side: 'ven. 17:00' },
-]
-const JOB_MCPS: Array<[label: string, on?: number]> = [
-  ['Sentry', JB.MCP],
-  ['Linear', JB.MCP + 0.6],
-  ['Slack'],
-  ['Notion'],
-  ['Amplitude'],
-  ['Datadog'],
-]
+const CL_MS = 57000
+const CL = {
+  TAB: 1.4,
+  PAGE: 1.7,
+  FILTER: 5,
+  OPEN: 6.8,
+  GRAPH: 7.4,
+  PAN: 11.8,
+  PANNED: 12.9,
+  EDIT: 13.9,
+  DRAFT: 16.8,
+  VALIDATE: 19.2,
+  MENU: 20.6,
+  PICK: 21.6,
+  MCP: 24.4,
+  CHECKED: 26.4,
+  AUTH: 27.8,
+  AUTHED: 29,
+  ADD: 31,
+  NAME: 31.9,
+  URL: 32.8,
+  ADDED: 34,
+  TRASH: 36.6,
+  REMOVE: 37.3,
+  TASKS: 39.6,
+  NEW: 42.4,
+  TITLE: 43.1,
+  PROMPT: 43.9,
+  ALLOW: 45.9,
+  CREATE: 47.6,
+  RUN: 49.2,
+  RAN: 50.8,
+  ROW: 51.8,
+  SESSION: 53,
+  END: 54.2,
+}
+
+// Where the cursor goes, in the window
+const CL_AT = {
+  mine: [388, 201],
+  skill: [400, 442],
+  grab: [756, 518],
+  drop: [56, 518],
+  edit: [825, 140],
+  validate: [844, 140],
+  version: [648, 140],
+  older: [640, 200],
+  mcpPart: [151, 97],
+  connect: [733, 298],
+  add: [726, 201],
+  name: [480, 149],
+  url: [480, 241],
+  addSave: [636, 506],
+  trash: [765, 394],
+  confirm: [705, 394],
+  tasksPart: [323, 157],
+  newTask: [727, 201],
+  title: [480, 149],
+  prompt: [480, 248],
+  sentry: [362, 400],
+  linear: [296, 400],
+  create: [639, 546],
+  play: [766, 346],
+  row: [420, 346],
+  session: [671, 278],
+} satisfies Record<string, [number, number]>
+
+// The list rows, one under the other from the toolbar down
+const slotTop = (slot: number) => 228 + 48 * slot
+// The graph scrolls this far left when dragged
+const PAN_X = -700
+
+const CL_TRACKS: Record<string, Array<[number, string]>> = {
+  // Dragged to its end, then drawn anew when the file changes and when an old version shows
+  graph: [
+    [CL.PAN, 'transform: translateX(0); opacity: 1;'],
+    [CL.PANNED, `transform: translateX(${PAN_X}px); opacity: 1;`],
+    [CL.DRAFT, `transform: translateX(${PAN_X}px); opacity: 1;`],
+    [CL.DRAFT + 0.15, `transform: translateX(${PAN_X}px); opacity: 0;`],
+    [CL.DRAFT + 0.16, 'transform: translateX(0); opacity: 0;'],
+    [CL.DRAFT + 0.4, 'transform: translateX(0); opacity: 1;'],
+    [CL.PICK + 0.05, 'transform: translateX(0); opacity: 1;'],
+    [CL.PICK + 0.2, 'transform: translateX(0); opacity: 0;'],
+    [CL.PICK + 0.45, 'transform: translateX(0); opacity: 1;'],
+  ],
+  // The minimap follows the drag
+  view: [
+    [CL.PAN, 'transform: translateX(0);'],
+    [CL.PANNED, 'transform: translateX(44px);'],
+    [CL.DRAFT + 0.16, 'transform: translateX(44px);'],
+    [CL.DRAFT + 0.5, 'transform: translateX(0);'],
+  ],
+  // The version and the edit button make room for « Valider la v4 », then take it back
+  bar: [
+    [CL.DRAFT, 'transform: translateX(0);'],
+    [CL.DRAFT + 0.3, 'transform: translateX(-120px);'],
+    [CL.VALIDATE + 0.15, 'transform: translateX(-120px);'],
+    [CL.VALIDATE + 0.45, 'transform: translateX(0);'],
+  ],
+  // Datadog comes first among the calls, the others move over for it
+  chips: [
+    [CL.DRAFT + 0.2, 'transform: translateX(0);'],
+    [CL.DRAFT + 0.5, 'transform: translateX(79px);'],
+    [CL.PICK + 0.1, 'transform: translateX(79px);'],
+    [CL.PICK + 0.4, 'transform: translateX(0);'],
+  ],
+  // The servers under Postgres move up once it is gone
+  tail: [
+    [CL.REMOVE + 0.25, 'transform: translateY(0);'],
+    [CL.REMOVE + 0.55, 'transform: translateY(-48px);'],
+  ],
+  // The claude.ai connectors make room for posthog, then for nothing
+  connectors: [
+    [CL.ADDED + 0.25, 'transform: translateY(0);'],
+    [CL.ADDED + 0.55, 'transform: translateY(48px);'],
+    [CL.REMOVE + 0.25, 'transform: translateY(48px);'],
+    [CL.REMOVE + 0.55, 'transform: translateY(0);'],
+  ],
+}
+
+const CL_CSS = Object.entries(CL_TRACKS)
+  .map(([name, steps]) => keyframes(`w-cl-${name}`, CL_MS / 1000, steps))
+  .join('\n')
+
+const move = (name: string, extra: CSSProperties = {}): CSSProperties => ({
+  animation: `w-cl-${name} ${CL_MS}ms linear both`,
+  ...extra,
+})
+
+// Text that types itself, a piece at a time
+function Typed({ text, at, step, by = 'word' }: { text: string; at: number; step: number; by?: 'word' | 'char' }) {
+  const pieces = by === 'char' ? [...text] : text.split(/(?<= )/)
+  return (
+    <>
+      {pieces.map((piece, index) => (
+        <span key={index} className="w-fade" style={d(at + index * step)}>
+          {piece}
+        </span>
+      ))}
+    </>
+  )
+}
+
+// A row of pills, one of them selected at a time
+function Pills({
+  items,
+  className = '',
+  style,
+}: {
+  items: Array<[label: ReactNode, width: number, on: Range[]]>
+  className?: string
+  style?: CSSProperties
+}) {
+  return (
+    <span className={`w-subtabs ${className}`} style={style}>
+      {items.map(([label, width, on], index) => (
+        <span key={index} className="w-tab" style={{ width }}>
+          <span className="w-tab-label">{label}</span>
+          {on.map(([from, to]) => (
+            <span key={from} className="w-tab-on w-span" style={span(from, to)}>
+              <span className="w-tab-label">{label}</span>
+            </span>
+          ))}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+type Part = 'Skills' | 'MCP' | 'Tâches'
+const PART_WIDTH: Record<Part, number> = { Skills: 62, MCP: 54, Tâches: 70 }
+
+function Parts({ left, top, on }: { left: number; top: number; on: Partial<Record<Part, Range[]>> }) {
+  const items = (Object.keys(PART_WIDTH) as Part[]).map(
+    label => [label, PART_WIDTH[label], on[label] ?? []] as [ReactNode, number, Range[]],
+  )
+  return <Pills items={items} style={pos(left, top)} />
+}
+
+// The top of the tab while no skill is open: its name, what the part shows, the three parts
+function ClaudeTop({ hint, on }: { hint: string; on: Partial<Record<Part, Range[]>> }) {
+  return (
+    <>
+      <span className="w-sheet-titles" style={pos(170, 84)}>
+        <b>Claude</b>
+        <small>{hint}</small>
+      </span>
+      <Parts left={170} top={140} on={on} />
+    </>
+  )
+}
+
+// A button the cursor presses, at a place of the window
+function Press({
+  at,
+  left,
+  top,
+  className = '',
+  width,
+  children,
+}: {
+  at?: number
+  left: number
+  top: number
+  className?: string
+  width?: number
+  children: ReactNode
+}) {
+  return (
+    <span style={pos(left, top)}>
+      <span className={`w-button small w-cl-button ${className}${at === undefined ? '' : ' w-press'}`} style={d(at ?? 0, { width })}>
+        {children}
+      </span>
+    </span>
+  )
+}
 
 function JobLine({
   icon,
   skill,
   name,
+  badge,
   meta,
   side,
+  play,
   className,
   style,
 }: {
   icon: ReactNode
   skill?: string
   name: string
+  badge?: string
   meta: string
   side: ReactNode
+  // When the cursor presses its play button
+  play?: number
   className?: string
   style?: CSSProperties
 }) {
@@ -1436,11 +1660,12 @@ function JobLine({
         <b>
           {skill && <span className="w-check-ref">/{skill}</span>}
           {name}
+          {badge && <span className="w-cl-badge">{badge}</span>}
         </b>
         <small>{meta}</small>
       </span>
       <span className="w-check-side">{side}</span>
-      <span className="w-job-play">
+      <span className={`w-job-play${play === undefined ? '' : ' w-press'}`} style={play === undefined ? undefined : d(play)}>
         <Play size={10} />
       </span>
     </span>
@@ -1474,129 +1699,1056 @@ function McpChip({ label, on }: { label: string; on?: number }) {
   )
 }
 
-function JobForm() {
+/* Skills */
+
+const SOURCE_ICON = { skill: Sparkles, command: SquareSlash, plugin: Puzzle }
+
+// Each skill and its slot under Tous, then under Mes skills
+const CL_SKILLS: Array<{
+  name: string
+  source: keyof typeof SOURCE_ICON
+  text: string
+  used: string
+  all: number | null
+  mine: number | null
+}> = [
+  { name: 'gl_commit', source: 'command', text: 'Crée des commits propres à partir des changements en cours', used: 'il y a 4 j · 149×', all: 0, mine: 0 },
+  { name: 'gl_take_comment_review', source: 'command', text: 'Traite les retours de review d’une PR', used: 'il y a 4 j · 33×', all: 1, mine: 1 },
+  { name: 'design-taste-frontend', source: 'skill', text: 'Le skill anti-slop des pages front', used: 'il y a 7 j · 1×', all: 2, mine: 2 },
+  { name: 'gl_diagnostic_bug', source: 'command', text: 'Diagnostic d’un bug à partir de Sentry ou de Linear', used: 'il y a 7 j · 40×', all: 3, mine: 3 },
+  { name: 'frontend-design:frontend-design', source: 'plugin', text: 'Une direction visuelle franche pour le front', used: 'il y a 7 j · 6×', all: 4, mine: null },
+  { name: 'slack:slack-messaging', source: 'plugin', text: 'Écrire un message Slack bien formé', used: 'il y a 8 j · 4×', all: 5, mine: null },
+  { name: 'gl_linear_issue', source: 'command', text: 'Exécute un ticket Linear de bout en bout', used: 'il y a 10 j · 68×', all: 6, mine: 4 },
+  { name: 'gl_cadrage_mobile', source: 'command', text: 'Co-écrit un cadrage tech app', used: 'il y a 12 j · 9×', all: 7, mine: 5 },
+  { name: 'gl_jump_in', source: 'command', text: 'Un document jump-in à partir d’un cadrage', used: 'il y a 15 j · 7×', all: null, mine: 6 },
+  { name: 'gl_create_linear_issue', source: 'command', text: 'Rédige une tâche Linear bien structurée', used: 'il y a 18 j · 12×', all: null, mine: 7 },
+]
+
+function SkillLine({ skill, className, style }: { skill: (typeof CL_SKILLS)[number]; className: string; style: CSSProperties }) {
+  const Icon = SOURCE_ICON[skill.source]
   return (
-    <span className="w-job-form">
-      <span className="w-job-form-head">
-        <b>Nouvelle tâche</b>
-        <span className="w-switch" />
+    <span className={`w-check ${className}`} style={style}>
+      <Icon size={15} className="w-ci" />
+      <span className="w-check-main">
+        <b>
+          <span className="w-check-ref">/{skill.name}</span>
+        </b>
+        <small>{skill.text}</small>
       </span>
-      <span className="w-field">
-        <small>Nom</small>
-        <span className="w-input">
-          <span className="w-in" style={d(JB.NAME)}>
-            Point Sentry du matin
-          </span>
-        </span>
-      </span>
-      <span className="w-field">
-        <small>Action</small>
-        <Segments options={['Un prompt', 'Une skill']} />
-        <span className="w-input tall">
-          <span className="w-in" style={d(JB.PROMPT)}>
-            Liste les nouvelles erreurs Sentry de la nuit et ouvre un ticket Linear pour chacune.
-          </span>
-        </span>
-      </span>
-      <span className="w-field">
-        <small>Récurrence</small>
-        <Segments options={['Certains jours', 'Toutes les heures', 'À la demande']} />
-        <span className="w-days">
-          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, index) => (
-            <span key={index} className={index < 5 ? 'on' : undefined}>
-              {day}
+      <span className="w-check-side">{skill.used}</span>
+    </span>
+  )
+}
+
+function SkillRows() {
+  return (
+    <>
+      {CL_SKILLS.map(skill => {
+        const line = (className: string, style: CSSProperties) => (
+          <SkillLine skill={skill} className={className} style={style} />
+        )
+        // Only under Mes skills: they come up from below the plugins
+        if (skill.all === null) {
+          return (
+            <span key={skill.name} className="w-cl-slot" style={pos(170, slotTop(skill.mine ?? 0))}>
+              {line('w-in', d(CL.FILTER + 0.45 + 0.06 * ((skill.mine ?? 0) - 6)))}
             </span>
-          ))}
-          <span className="w-time">
-            <Clock size={11} />
-            09:30
+          )
+        }
+        const enter = d(CL.PAGE + 0.2 + 0.05 * skill.all)
+        // A plugin's: it leaves when the filter keeps only yours
+        if (skill.mine === null) {
+          return (
+            <span key={skill.name} className="w-cl-slot w-out" style={d(CL.FILTER + 0.1, pos(170, slotTop(skill.all)))}>
+              {line('w-in', enter)}
+            </span>
+          )
+        }
+        const lift = (skill.mine - skill.all) * 48
+        return (
+          <span
+            key={skill.name}
+            className={`w-cl-slot${lift ? ' w-lift' : ''}`}
+            style={d(CL.FILTER + 0.25, pos(170, slotTop(skill.all), { '--dy': `${lift}px` } as CSSProperties))}
+          >
+            {line('w-in', enter)}
           </span>
-        </span>
+        )
+      })}
+    </>
+  )
+}
+
+function SkillsList() {
+  const owners: Array<[ReactNode, number, Range[]]> = [
+    [<>Tous<span className="w-count">67</span></>, 52, [[0, CL.FILTER]]],
+    [<>Mes skills<span className="w-count">11</span></>, 84, [[CL.FILTER, 99]]],
+    [<>Extérieurs<span className="w-count">56</span></>, 84, []],
+  ]
+  return (
+    <div className="w-layer w-span" style={span(CL.PAGE + 0.1, CL.OPEN + 0.1)}>
+      <ClaudeTop hint="Tes skills Claude Code, du plus récemment lancé au plus ancien." on={{ Skills: [[0, 99]] }} />
+      <span className="w-cl-search" style={pos(170, 186)}>
+        <Search size={12} />
+        Chercher un skill
       </span>
-      <span className="w-field">
-        <small>MCP autorisés</small>
-        <span className="w-chips">
-          {JOB_MCPS.map(([label, on]) => (
-            <McpChip key={label} label={label} on={on} />
-          ))}
-        </span>
-        <small>La tâche n’a accès qu’aux MCP cochés, les autres lui sont refusés.</small>
+      <Pills items={owners} className="w-cl-seg" style={pos(292, 186)} />
+      <span className="w-cl-note" style={{ top: 194, right: 170 }}>
+        <Ticker
+          values={[
+            [0, '67 skills, du plus récemment lancé au plus ancien'],
+            [CL.FILTER + 0.1, '11 skills, du plus récemment lancé au plus ancien'],
+          ]}
+        />
       </span>
-      <span className="w-job-form-foot">
-        <span className="w-button small">Annuler</span>
-        <span className="w-button small solid w-press" style={d(JB.SAVE)}>
-          Créer le job
-        </span>
+      <SkillRows />
+    </div>
+  )
+}
+
+/* An open skill: its graph, its versions */
+
+type Kind = 'mcp' | 'cli' | 'skill' | 'agent' | 'file'
+const KIND: Record<Kind, [label: string, icon: LucideIcon]> = {
+  mcp: ['MCP', Plug],
+  cli: ['Commande', SquareTerminal],
+  skill: ['Skill', Sparkles],
+  agent: ['Agent', Bot],
+  file: ['Fichiers', FileText],
+}
+interface ClCall {
+  kind: Kind
+  label: string
+  details?: string[]
+}
+
+// /gl_linear_issue as Flux reads it: its sections become the steps, what they reach the calls
+const CL_STEPS: Array<{ title: string; points: string[]; calls: ClCall[] }> = [
+  {
+    title: 'Setup worktree',
+    points: ['Vérifier la branche courante', 'Pull latest', 'Créer le worktree', 'Confirmer'],
+    calls: [
+      { kind: 'cli', label: 'git', details: ['git branch', 'git pull'] },
+      { kind: 'cli', label: 'wt', details: ['wt', 'wt switch'] },
+    ],
+  },
+  {
+    title: 'Avant',
+    points: ['Identité Linear', 'Passer le ticket en « In Progress »', 'Tout lire'],
+    calls: [{ kind: 'mcp', label: 'Linear', details: ['list_users', 'save_issue'] }],
+  },
+  {
+    title: 'Contexte',
+    points: [],
+    calls: [
+      { kind: 'mcp', label: 'Figma', details: ['get_design_context'] },
+      { kind: 'mcp', label: 'Sentry' },
+    ],
+  },
+  {
+    title: 'Standards',
+    points: ['Règles du repo', 'Voisins récents', 'Reviews passées', 'Standards déjà capturés'],
+    calls: [
+      { kind: 'cli', label: 'gh', details: ['gh api'] },
+      { kind: 'cli', label: 'git', details: ['git log'] },
+      { kind: 'agent', label: 'Sous-agent' },
+      { kind: 'file', label: 'Fichiers', details: ['.ai-rules/index.md'] },
+    ],
+  },
+  { title: 'Plan', points: [], calls: [] },
+  { title: 'Exécution', points: [], calls: [] },
+  {
+    title: 'Test local',
+    points: [
+      'Lance l’environnement',
+      'Ouvre l’app dans le navigateur intégré',
+      'Déroule les critères de validation',
+      'Corrige ce qui diverge',
+      'Rends compte',
+    ],
+    calls: [
+      { kind: 'skill', label: '/anthropic-skills:built-in-browser' },
+      { kind: 'skill', label: '/run' },
+    ],
+  },
+  {
+    title: 'Finition',
+    points: ['Commit + push', 'Ouvrir une PR', 'Afficher la commande cursor'],
+    calls: [
+      { kind: 'mcp', label: 'Linear' },
+      { kind: 'cli', label: 'cursor', details: ['cursor'] },
+      { kind: 'cli', label: 'gh', details: ['gh pr'] },
+      { kind: 'skill', label: '/gl_commit' },
+    ],
+  },
+]
+// What the edit in Claude adds to Contexte
+const CL_DATADOG: ClCall = { kind: 'mcp', label: 'Datadog', details: ['search_datadog_logs'] }
+// Every call of the skill, the way the page lists them: by kind, then by name
+const CL_CHIPS: Array<[Kind, string]> = [
+  ['mcp', 'Figma'],
+  ['mcp', 'Linear'],
+  ['mcp', 'Sentry'],
+  ['cli', 'cursor'],
+  ['cli', 'gh'],
+  ['cli', 'git'],
+  ['cli', 'wt'],
+  ['skill', '/anthropic-skills:built-in-browser'],
+  ['skill', '/gl_commit'],
+  ['skill', '/run'],
+  ['agent', 'Sous-agent'],
+  ['file', 'Fichiers'],
+]
+
+// The graph, in the coordinates of its box: n8n's way, left to right, the calls hanging below
+const GRAPH_LEFT = 60
+const GRAPH_TOP = 268
+const STEP_TOP = 20
+const STEP_W = 140
+const EDGE_Y = 37
+const stepLeft = (index: number) => 186 + 176 * index
+const stepHeight = (points: number) => (points === 0 ? 34 : 40 + 14 * Math.min(points, 5))
+const callHeight = (call: ClCall) => 40 + 13 * Math.min(call.details?.length ?? 0, 2)
+// The first four steps build up one after the other; the rest wait off to the right
+const stepAt = (index: number) => CL.GRAPH + 0.45 + 0.55 * Math.min(index, 3.5)
+
+function callTops(index: number, calls: ClCall[]): number[] {
+  let top = STEP_TOP + stepHeight(CL_STEPS[index].points.length) + 16
+  return calls.map(call => {
+    const at = top
+    top += callHeight(call) + 8
+    return at
+  })
+}
+
+function CallNode({ call, left, top, className = '', style }: {
+  call: ClCall
+  left: number
+  top: number
+  className?: string
+  style?: CSSProperties
+}) {
+  const [kind, Icon] = KIND[call.kind]
+  return (
+    <span className={`w-cl-call ${call.kind} ${className}`} style={{ left, top, height: callHeight(call), ...style }}>
+      <span className="w-cl-call-icon">
+        <Icon size={12} />
+      </span>
+      <span className="w-cl-node-main">
+        <span className="w-cl-kind">{kind}</span>
+        <b>{call.label}</b>
+        {call.details?.slice(0, 2).map(detail => (
+          <code key={detail}>{detail}</code>
+        ))}
       </span>
     </span>
   )
 }
 
-function JobsPicture() {
-  const specs = tabs({
-    File: { on: [0, JB.TAB] },
-    Claude: { on: [JB.TAB, 99] },
+function GraphStep({ index }: { index: number }) {
+  const step = CL_STEPS[index]
+  const at = stepAt(index)
+  const left = stepLeft(index)
+  const height = stepHeight(step.points.length)
+  const previous = index === 0 ? 166 : stepLeft(index - 1) + STEP_W
+  const tops = callTops(index, step.calls)
+  const bottom = STEP_TOP + height
+  return (
+    <>
+      <span className="w-cl-edge w-draw" style={d(at - 0.15, { left: previous, top: EDGE_Y, width: left - previous })} />
+      <span className="w-cl-step w-in" style={d(at, { left, top: STEP_TOP, height })}>
+        <span className="w-cl-step-head">
+          <i>{index + 1}</i>
+          {step.title}
+        </span>
+        {step.points.length > 0 && (
+          <ol>
+            {step.points.slice(0, 5).map(point => (
+              <li key={point}>{point}</li>
+            ))}
+          </ol>
+        )}
+      </span>
+      {tops.length > 0 && (
+        <span
+          className="w-cl-rail w-grow"
+          style={d(at + 0.2, {
+            left: left + 10,
+            top: bottom,
+            height: tops[tops.length - 1] + callHeight(step.calls[tops.length - 1]) / 2 - bottom,
+          })}
+        />
+      )}
+      {step.calls.map((call, row) => (
+        <Fragment key={row}>
+          <span
+            className="w-cl-stub w-fade"
+            style={d(at + 0.3 + 0.08 * row, { left: left + 10, top: tops[row] + callHeight(call) / 2 })}
+          />
+          <CallNode call={call} left={left + 20} top={tops[row]} className="w-in" style={d(at + 0.3 + 0.08 * row)} />
+        </Fragment>
+      ))}
+    </>
+  )
+}
+
+// The minimap: every node drawn tiny, and the part of the graph in view
+const MINI = 0.063
+function MiniMap() {
+  const boxes: Array<[number, number, number, number]> = [[16, 6, 150, 63]]
+  CL_STEPS.forEach((step, index) => {
+    boxes.push([stepLeft(index), STEP_TOP, STEP_W, stepHeight(step.points.length)])
+    callTops(index, step.calls).forEach((top, row) => boxes.push([stepLeft(index) + 20, top, 120, callHeight(step.calls[row])]))
   })
-  const action = (
-    <span className="w-button small solid w-press" style={d(JB.NEW)}>
-      <Plus size={12} />
-      Nouvelle tâche
+  return (
+    <span className="w-cl-mini">
+      {boxes.map(([left, top, width, height], index) => (
+        <i key={index} style={{ left: 2 + left * MINI, top: 20 + top * MINI, width: width * MINI, height: height * MINI }} />
+      ))}
+      <span className="w-cl-view" style={move('view', { left: 1, top: 14, width: 840 * MINI, height: 292 * MINI + 10 })} />
     </span>
   )
-  const sub = (
-    <Ticker
-      values={[
-        [0, '2 tâches · prochain : Daily du matin, demain 9:00'],
-        [JB.SAVE + 0.3, '3 tâches · prochain : Daily du matin, demain 9:00'],
-      ]}
-    />
+}
+
+function SkillGraphBox() {
+  const datadogTop = callTops(2, [...CL_STEPS[2].calls, CL_DATADOG])[2]
+  const sentryTop = callTops(2, CL_STEPS[2].calls)[1]
+  const contexte = stepLeft(2)
+  return (
+    <span className="w-cl-graph w-in" style={d(CL.OPEN + 0.3, pos(GRAPH_LEFT, GRAPH_TOP))}>
+      <span className="w-cl-track" style={move('graph')}>
+        <span className="w-cl-trigger w-in" style={d(CL.GRAPH, { left: 16, top: 6 })}>
+          <span className="w-cl-trigger-icon">
+            <Zap size={13} />
+          </span>
+          <span className="w-cl-node-main">
+            <span className="w-cl-kind">Déclencheur</span>
+            <b>/gl_linear_issue</b>
+            <span className="w-cl-frame">Cadre : Notes</span>
+          </span>
+        </span>
+        {CL_STEPS.map((_, index) => (
+          <GraphStep key={index} index={index} />
+        ))}
+        {/* The call the edit adds, there from the draft until an older version shows */}
+        <span
+          className="w-cl-rail w-span"
+          style={span(CL.DRAFT + 0.5, CL.PICK + 0.1, {
+            left: contexte + 10,
+            top: sentryTop + callHeight(CL_STEPS[2].calls[1]) / 2,
+            height: datadogTop + callHeight(CL_DATADOG) / 2 - sentryTop - callHeight(CL_STEPS[2].calls[1]) / 2,
+          })}
+        />
+        <span
+          className="w-cl-stub w-span"
+          style={span(CL.DRAFT + 0.5, CL.PICK + 0.1, { left: contexte + 10, top: datadogTop + callHeight(CL_DATADOG) / 2 })}
+        />
+        <span className="w-span" style={span(CL.DRAFT + 0.5, CL.PICK + 0.1, { left: contexte + 20, top: datadogTop })}>
+          <CallNode call={CL_DATADOG} left={0} top={0} />
+          <span className="w-cl-halo w-glow" style={span(CL.DRAFT + 0.6, CL.DRAFT + 1.9)} />
+        </span>
+      </span>
+      <span className="w-cl-controls">
+        <i>
+          <Plus size={11} />
+        </i>
+        <i>
+          <Minus size={11} />
+        </i>
+        <i>
+          <Scan size={10} />
+        </i>
+      </span>
+      <MiniMap />
+    </span>
   )
+}
+
+function SkillHead() {
+  return (
+    <>
+      <span className="w-cl-head" style={pos(60, 164)}>
+        <SquareSlash size={16} />
+        /gl_linear_issue
+      </span>
+      <span className="w-cl-desc" style={pos(60, 193)}>
+        Exécute un ticket Linear de bout en bout : setup d’un worktree isolé, lecture du ticket, contexte (Figma /
+        Sentry), standards du repo, plan, exécution, test local et PR.
+      </span>
+      <span className="w-cl-facts" style={pos(60, 214)}>
+        Commande · il y a 10 j · 68 lancements
+        <span className="w-cl-stack">
+          <span className="w-cl-pill draft w-span" style={span(CL.DRAFT + 0.2, CL.VALIDATE + 0.1)}>
+            brouillon à valider
+          </span>
+          <span className="w-cl-pill w-in" style={d(CL.PICK + 0.3)}>
+            <Lock size={10} />
+            version précédente, lecture seule
+          </span>
+        </span>
+      </span>
+      <span className="w-cl-chips" style={pos(60, 238)}>
+        <span className="w-cl-chip-row" style={move('chips')}>
+          {CL_CHIPS.map(([kind, label]) => {
+            const Icon = KIND[kind][1]
+            return (
+              <span key={`${kind}:${label}`} className={`w-cl-chip ${kind}`}>
+                <Icon size={10} />
+                {label}
+              </span>
+            )
+          })}
+        </span>
+        <span className="w-cl-chip mcp first w-span" style={span(CL.DRAFT + 0.45, CL.PICK + 0.1)}>
+          <Plug size={10} />
+          Datadog
+        </span>
+      </span>
+    </>
+  )
+}
+
+const CL_VERSIONS = [
+  'v4 · 20 nov. 2026 · actuelle',
+  'v3 · 12 nov. 2026 · lecture seule',
+  'v2 · 4 nov. 2026 · lecture seule',
+  'v1 · 28 oct. 2026 · lecture seule',
+]
+
+function SkillBar() {
+  return (
+    <>
+      <Press left={60} top={125} width={78}>
+        <ArrowLeft size={12} />
+        Skills
+      </Press>
+      <Pills
+        items={[
+          ['Graphe', 64, [[0, 99]]],
+          ['Contenu', 68, []],
+        ]}
+        className="w-cl-seg"
+        style={pos(146, 125)}
+      />
+      <span className="w-cl-bar" style={move('bar')}>
+        <span className="w-cl-label" style={pos(506, 133)}>
+          Version
+        </span>
+        <span style={pos(554, 125)}>
+          <span className="w-cl-select w-press" style={d(CL.MENU)}>
+            <Ticker
+              values={[
+                [0, 'v3 · 12 nov. 2026 · actuelle'],
+                [CL.DRAFT, 'Brouillon · non validé'],
+                [CL.VALIDATE + 0.1, CL_VERSIONS[0]],
+                [CL.PICK + 0.1, CL_VERSIONS[1]],
+              ]}
+            />
+            <ChevronDown size={12} />
+          </span>
+        </span>
+        <Press left={750} top={125} at={CL.EDIT} width={150}>
+          <PenLine size={12} />
+          Éditer dans Claude
+        </Press>
+      </span>
+      <span className="w-span" style={span(CL.DRAFT + 0.1, CL.VALIDATE + 0.1, pos(788, 125))}>
+        <span className="w-button small solid w-cl-button w-press" style={d(CL.VALIDATE, { width: 112 })}>
+          <BadgeCheck size={12} />
+          Valider la v4
+        </span>
+      </span>
+      <span className="w-cl-menu w-span" style={span(CL.MENU + 0.15, CL.PICK + 0.1, pos(554, 160))}>
+        {CL_VERSIONS.map((version, index) => (
+          <span key={version} className="w-cl-option">
+            {index === 1 && <span className="w-cl-hover w-glow" style={span(CL.PICK - 0.35, CL.PICK + 0.2)} />}
+            {index === 0 && <Check size={11} />}
+            {version}
+          </span>
+        ))}
+      </span>
+    </>
+  )
+}
+
+function SkillDetail() {
+  return (
+    <div className="w-layer w-span" style={span(CL.OPEN + 0.2, CL.MCP + 0.1)}>
+      <Parts left={60} top={80} on={{ Skills: [[0, CL.MCP]], MCP: [[CL.MCP, 99]] }} />
+      <SkillBar />
+      <SkillHead />
+      <SkillGraphBox />
+      <span className="w-cl-path" style={pos(60, 570)}>
+        ~/.claude/commands/gl_linear_issue.md
+      </span>
+    </div>
+  )
+}
+
+// A Claude Desktop session over Flux: what was asked, what Claude did
+function ClaudeCard({
+  from,
+  to,
+  title,
+  ask,
+  typed,
+  answer,
+  answerAt,
+  left,
+  top,
+}: {
+  from: number
+  to: number
+  title: string
+  ask: string
+  typed?: number
+  answer: ReactNode
+  answerAt: number
+  left: number
+  top: number
+}) {
+  return (
+    <div className="w-layer">
+      <span className="w-cl-claude w-span" style={span(from, to, pos(left, top))}>
+        <span className="w-cl-claude-head">
+          <BrandIcon brand="claude" size={14} />
+          <b>Claude</b>
+          <small>{title}</small>
+        </span>
+        <span className="w-cl-ask">{typed === undefined ? ask : <Typed text={ask} at={typed} step={0.09} />}</span>
+        <span className="w-cl-answer w-in" style={d(answerAt)}>
+          {answer}
+        </span>
+      </span>
+    </div>
+  )
+}
+
+/* MCP */
+
+type Health = 'ok' | 'auth' | 'failed'
+const HEALTH: Record<Health, [label: string, icon: LucideIcon]> = {
+  ok: ['connecté', CircleCheck],
+  auth: ['à connecter', CircleAlert],
+  failed: ['injoignable', CircleX],
+}
+
+function McpLine({
+  name,
+  meta,
+  icons,
+  pills,
+  button = 'refresh',
+  keyUntil,
+  press,
+  locked,
+  trash,
+}: {
+  name: string
+  meta: string
+  icons: Array<[t: number, state: Health | 'busy']>
+  pills: Array<[t: number, health: Health]>
+  button?: 'key' | 'refresh'
+  keyUntil?: number
+  press?: number
+  locked?: boolean
+  trash?: number
+}) {
+  const reconnect =
+    button === 'key' ? (
+      keyUntil === undefined ? (
+        <KeyRound size={12} />
+      ) : (
+        <Ticker
+          values={[
+            [0, <KeyRound key="key" size={12} />],
+            [keyUntil, <RefreshCw key="again" size={12} />],
+          ]}
+        />
+      )
+    ) : (
+      <RefreshCw size={12} />
+    )
+  return (
+    <span className="w-check w-cl-mcp">
+      <Ticker
+        values={icons.map(([t, state]): [number, ReactNode] => {
+          if (state === 'busy') return [t, <LoaderCircle key={t} size={15} className="w-ci spin" />]
+          const Icon = HEALTH[state][1]
+          return [t, <Icon key={t} size={15} className={`w-ci ${state}`} />]
+        })}
+      />
+      <span className="w-check-main">
+        <b>
+          {name}
+          <Ticker
+            values={pills.map(([t, health]): [number, ReactNode] => [
+              t,
+              <span key={t} className={`w-cl-pill ${health}`}>
+                {HEALTH[health][0]}
+              </span>,
+            ])}
+          />
+        </b>
+        <small>{meta}</small>
+      </span>
+      <span className="w-cl-actions">
+        <span className={`w-cl-round${press === undefined ? '' : ' w-press'}`} style={press === undefined ? undefined : d(press)}>
+          {reconnect}
+        </span>
+        <span
+          className={`w-cl-round${locked ? ' locked' : ''}${trash === undefined ? '' : ' w-press'}`}
+          style={trash === undefined ? undefined : d(trash)}
+        >
+          <Trash2 size={12} />
+        </span>
+      </span>
+      {trash !== undefined && (
+        <span className="w-cl-armed w-span" style={span(trash + 0.05, CL.REMOVE + 0.15)}>
+          <Trash2 size={12} />
+          Retirer « postgres »
+        </span>
+      )}
+    </span>
+  )
+}
+
+// claude mcp list answers server by server
+const checked = (index: number) => CL.MCP + 0.9 + 0.25 * index
+
+function McpPart() {
+  return (
+    <div className="w-layer w-span" style={span(CL.MCP + 0.2, CL.TASKS + 0.1)}>
+      <ClaudeTop
+        hint="Les serveurs MCP que Claude Code charge, et leur état."
+        on={{ MCP: [[0, CL.TASKS]], Tâches: [[CL.TASKS, 99]] }}
+      />
+      <span className="w-cl-note" style={pos(170, 194)}>
+        <Ticker
+          values={[
+            [
+              0,
+              <>
+                <LoaderCircle size={11} className="spin" />
+                Claude vérifie chaque serveur…
+              </>,
+            ],
+            [CL.CHECKED, 'Vérifiés à l’instant par claude mcp list'],
+          ]}
+        />
+      </span>
+      <Press left={550} top={186} width={106}>
+        <RefreshCw size={11} />
+        Tout vérifier
+      </Press>
+      <Press left={662} top={186} at={CL.ADD} className="solid" width={128}>
+        <Plus size={12} />
+        Ajouter un MCP
+      </Press>
+      <span className="w-cl-slot w-in" style={d(CL.MCP + 0.3, pos(170, slotTop(0)))}>
+        <McpLine
+          name="Linear"
+          meta="Plugin · HTTP · https://mcp.linear.app/mcp"
+          icons={[[0, 'busy'], [checked(0), 'ok']]}
+          pills={[[checked(0), 'ok']]}
+          locked
+        />
+      </span>
+      <span className="w-cl-slot w-in" style={d(CL.MCP + 0.35, pos(170, slotTop(1)))}>
+        <McpLine
+          name="Sentry"
+          meta="Utilisateur · HTTP · https://mcp.sentry.dev/mcp"
+          icons={[[0, 'busy'], [checked(1), 'auth'], [CL.AUTH + 0.1, 'busy'], [CL.AUTHED, 'ok']]}
+          pills={[[checked(1), 'auth'], [CL.AUTHED, 'ok']]}
+          button="key"
+          keyUntil={CL.AUTHED}
+          press={CL.AUTH}
+        />
+      </span>
+      <span className="w-cl-slot w-in" style={d(CL.MCP + 0.4, pos(170, slotTop(2)))}>
+        <McpLine
+          name="Datadog"
+          meta="Utilisateur · HTTP · https://mcp.datadoghq.com/v1/mcp"
+          icons={[[0, 'busy'], [checked(2), 'ok']]}
+          pills={[[checked(2), 'ok']]}
+        />
+      </span>
+      <span className="w-cl-slot w-out" style={d(CL.REMOVE + 0.15, pos(170, slotTop(3)))}>
+        <span className="w-in" style={d(CL.MCP + 0.45)}>
+          <McpLine
+            name="Postgres"
+            meta="Utilisateur · commande · uvx postgres-mcp --access-mode=restricted"
+            icons={[[0, 'busy'], [checked(3), 'failed'], [CL.REMOVE, 'busy']]}
+            pills={[[checked(3), 'failed']]}
+            trash={CL.TRASH}
+          />
+        </span>
+      </span>
+      <span className="w-cl-slot" style={move('tail', pos(170, slotTop(4)))}>
+        <span className="w-in" style={d(CL.MCP + 0.5)}>
+          <McpLine
+            name="Amplitude"
+            meta="Utilisateur · HTTP · https://mcp.amplitude.com/mcp"
+            icons={[[0, 'busy'], [checked(4), 'ok']]}
+            pills={[[checked(4), 'ok']]}
+          />
+        </span>
+      </span>
+      <span className="w-cl-slot" style={move('tail', pos(170, slotTop(5)))}>
+        <span className="w-in" style={d(CL.ADDED + 0.5)}>
+          <McpLine
+            name="Posthog"
+            meta="Utilisateur · HTTP · https://mcp.posthog.com/mcp"
+            icons={[[0, 'busy'], [CL.ADDED + 1.4, 'ok']]}
+            pills={[[CL.ADDED + 1.4, 'ok']]}
+          />
+        </span>
+      </span>
+      <span className="w-cl-slot" style={move('connectors', pos(170, slotTop(5) + 4))}>
+        <span className="w-cl-subhead w-in" style={d(CL.MCP + 0.55)}>
+          Connecteurs claude.ai
+        </span>
+        <span className="w-in" style={d(CL.MCP + 0.6, { marginTop: 6 })}>
+          <McpLine
+            name="Notion"
+            meta="claude.ai"
+            icons={[[0, 'busy'], [checked(5), 'ok']]}
+            pills={[[checked(5), 'ok']]}
+            locked
+          />
+        </span>
+      </span>
+    </div>
+  )
+}
+
+function McpForm() {
+  return (
+    <div className="w-layer w-span" style={span(CL.ADD + 0.2, CL.ADDED + 0.1)}>
+      <span className="w-scrim" />
+      <span className="w-job-form" style={{ top: 64 }}>
+        <span className="w-job-form-head">
+          <b>Ajouter un MCP</b>
+          <span className="w-cl-round">
+            <X size={12} />
+          </span>
+        </span>
+        <span className="w-field">
+          <small>Nom</small>
+          <span className="w-input">
+            <span className="w-cl-stack">
+              <span className="w-cl-placeholder w-out" style={d(CL.NAME)}>
+                sentry
+              </span>
+              <span>
+                <Typed text="posthog" at={CL.NAME} step={0.06} by="char" />
+              </span>
+            </span>
+          </span>
+        </span>
+        <span className="w-field">
+          <small>Type</small>
+          <Segments options={['HTTP', 'SSE', 'Commande']} />
+          <span className="w-input">
+            <span className="w-cl-stack">
+              <span className="w-cl-placeholder w-out" style={d(CL.URL)}>
+                https://mcp.exemple.com/mcp
+              </span>
+              <span>
+                <Typed text="https://mcp.posthog.com/mcp" at={CL.URL} step={0.03} by="char" />
+              </span>
+            </span>
+          </span>
+          <small>Si le serveur demande une connexion, « Reconnecter » ouvrira ton navigateur.</small>
+        </span>
+        <span className="w-field">
+          <small>Portée</small>
+          <Segments options={['Tous tes projets', '~/Desktop/ouihelp seulement']} />
+        </span>
+        <span className="w-field">
+          <small>En-têtes</small>
+          <span className="w-input tall w-cl-placeholder">Authorization: Bearer …</span>
+        </span>
+        <span className="w-field">
+          <small>Variables d’environnement</small>
+          <span className="w-input tall w-cl-placeholder">API_KEY=…</span>
+        </span>
+        <span className="w-job-form-foot">
+          <span className="w-button small">Annuler</span>
+          <span className="w-button small solid w-press" style={d(CL.ADDED)}>
+            Ajouter le MCP
+          </span>
+        </span>
+      </span>
+    </div>
+  )
+}
+
+/* Tasks */
+
+const TASK_MCPS: Array<[label: string, on?: number]> = [
+  ['Linear', CL.ALLOW + 0.5],
+  ['Sentry', CL.ALLOW],
+  ['Datadog'],
+  ['Amplitude'],
+  ['Posthog'],
+  ['Notion'],
+]
+
+function TaskForm() {
+  return (
+    <div className="w-layer w-span" style={span(CL.NEW + 0.2, CL.CREATE + 0.1)}>
+      <span className="w-scrim" />
+      <span className="w-job-form" style={{ top: 64 }}>
+        <span className="w-job-form-head">
+          <b>Nouvelle tâche</b>
+          <span className="w-cl-switch">
+            <span className="w-switch" />
+            Actif
+          </span>
+        </span>
+        <span className="w-field">
+          <small>Nom</small>
+          <span className="w-input">
+            <span>
+              <Typed text="Point Sentry du matin" at={CL.TITLE} step={0.1} />
+            </span>
+          </span>
+        </span>
+        <span className="w-field">
+          <small>Action</small>
+          <Segments options={['Un prompt', 'Une skill']} />
+          <span className="w-input tall">
+            <span>
+              <Typed
+                text="Liste les nouvelles erreurs Sentry de la nuit et ouvre un ticket Linear pour chacune."
+                at={CL.PROMPT}
+                step={0.06}
+              />
+            </span>
+          </span>
+        </span>
+        <span className="w-field">
+          <small>Récurrence</small>
+          <Segments options={['Certains jours', 'Toutes les heures', 'À la demande']} />
+          <span className="w-days">
+            {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, index) => (
+              <span key={index} className={index < 5 ? 'on' : undefined}>
+                {day}
+              </span>
+            ))}
+            <span className="w-time">
+              <Clock size={11} />
+              09:30
+            </span>
+          </span>
+        </span>
+        <span className="w-field">
+          <small>MCP autorisés</small>
+          <span className="w-chips">
+            {TASK_MCPS.map(([label, on]) => (
+              <McpChip key={label} label={label} on={on} />
+            ))}
+          </span>
+          <small>
+            <Ticker
+              values={[
+                [0, 'Aucun coché : la tâche tourne sans MCP.'],
+                [CL.ALLOW + 0.1, 'La tâche n’a accès qu’aux MCP cochés, les autres lui sont refusés.'],
+              ]}
+            />
+          </small>
+        </span>
+        <span className="w-cl-pair">
+          <span className="w-field">
+            <small>Dossier</small>
+            <span className="w-input">~/Desktop/ouihelp</span>
+          </span>
+          <span className="w-field">
+            <small>Permissions</small>
+            <Segments options={['Auto', 'Strict']} />
+          </span>
+        </span>
+        <span className="w-job-form-foot">
+          <span className="w-button small">Annuler</span>
+          <span className="w-button small solid w-press" style={d(CL.CREATE)}>
+            Créer la tâche
+          </span>
+        </span>
+      </span>
+    </div>
+  )
+}
+
+// An existing task opened: its form, then the runs, each a Claude session
+function TaskRuns() {
+  return (
+    <div className="w-layer w-span" style={span(CL.ROW + 0.2, CL.END - 0.2)}>
+      <span className="w-scrim" />
+      <span className="w-job-form" style={{ top: 130 }}>
+        <span className="w-job-form-head">
+          <b>Point Sentry du matin</b>
+          <span className="w-cl-switch">
+            <span className="w-switch" />
+            Actif
+          </span>
+        </span>
+        <span className="w-cl-skels">
+          <i className="w-skel" />
+          <i className="w-skel short" />
+          <i className="w-skel" />
+        </span>
+        <span className="w-field">
+          <small>Dernières exécutions</small>
+          <span className="w-cl-run">
+            <CircleCheck size={14} className="w-ci ok" />
+            <span className="w-check-main">
+              <b>aujourd’hui 10:12 · à la main · 2 min</b>
+              <small>3 nouvelles erreurs Sentry, 3 tickets Linear ouverts</small>
+            </span>
+            <span className="w-cl-round w-press" style={d(CL.SESSION)}>
+              <ExternalLink size={12} />
+            </span>
+          </span>
+        </span>
+        <span className="w-button small w-cl-start">
+          <Play size={11} />
+          Lancer maintenant
+        </span>
+        <span className="w-job-form-foot">
+          <span className="w-button small">Annuler</span>
+          <span className="w-button small solid">Enregistrer</span>
+        </span>
+      </span>
+    </div>
+  )
+}
+
+function TasksPart() {
+  return (
+    <div className="w-layer w-in" style={d(CL.TASKS + 0.2)}>
+      <ClaudeTop hint="Ce que Flux lance pour toi, à l’heure dite." on={{ Tâches: [[0, 99]] }} />
+      <span className="w-cl-note" style={pos(170, 194)}>
+        <Ticker
+          values={[
+            [0, '2 tâches · prochain : Daily, demain 9:30'],
+            [CL.CREATE + 0.4, '3 tâches · prochain : Point Sentry du matin, demain 9:30'],
+          ]}
+        />
+      </span>
+      <Press left={664} top={186} at={CL.NEW} className="solid" width={126}>
+        <Plus size={12} />
+        Nouvelle tâche
+      </Press>
+      <span className="w-cl-slot" style={pos(170, slotTop(0))}>
+        <JobLine
+          skill="gl_daily"
+          name="Daily"
+          badge="Flux"
+          meta="Du lundi au vendredi à 9:30 · lancé par Flux, en lecture seule"
+          side="demain 9:30"
+          className="w-in"
+          style={d(CL.TASKS + 0.3)}
+          icon={<CircleCheck size={15} className="w-ci ok" />}
+        />
+      </span>
+      <span className="w-cl-slot" style={pos(170, slotTop(1))}>
+        <JobLine
+          name="Revue des PR ouvertes"
+          meta="Chaque vendredi à 17:00 · 2 MCP"
+          side="ven. 17:00"
+          className="w-in"
+          style={d(CL.TASKS + 0.36)}
+          icon={<CircleCheck size={15} className="w-ci ok" />}
+        />
+      </span>
+      <span className="w-cl-slot" style={pos(170, slotTop(2))}>
+        <JobLine
+          name="Point Sentry du matin"
+          meta="Du lundi au vendredi à 9:30 · 2 MCP"
+          className="w-in"
+          style={d(CL.CREATE + 0.4)}
+          play={CL.RUN}
+          icon={
+            <Ticker
+              values={[
+                [0, <CircleDashed key="new" size={15} className="w-ci" />],
+                [CL.RUN + 0.1, <LoaderCircle key="run" size={15} className="w-ci spin" />],
+                [CL.RAN, <CircleCheck key="ok" size={15} className="w-ci ok" />],
+              ]}
+            />
+          }
+          side={
+            <Ticker
+              values={[
+                [0, 'demain 9:30'],
+                [CL.RUN + 0.1, 'En cours…'],
+                [CL.RAN, 'demain 9:30'],
+              ]}
+            />
+          }
+        />
+      </span>
+    </div>
+  )
+}
+
+function ClaudePicture() {
+  const specs = tabs({ File: { on: [0, CL.TAB] }, Claude: { on: [CL.TAB, 99] } })
   return (
     <Chrome specs={specs}>
-      <FileView className="w-out" style={d(JB.PAGE)} />
-      <div className="w-layer w-in" style={d(JB.PAGE + 0.1)}>
-        <Sheet title="Claude" sub={sub} action={action}>
-          <span className="w-section">
-            {JOBS.map((job, index) => (
-              <JobLine
-                key={job.name}
-                {...job}
-                className="w-in"
-                style={d(JB.PAGE + 0.2 + 0.07 * index)}
-                icon={<CircleCheck size={15} className="w-ci ok" />}
-              />
-            ))}
-            <JobLine
-              name="Point Sentry du matin"
-              meta="Du lundi au vendredi à 9:30 · 2 MCP"
-              className="w-in"
-              style={d(JB.SAVE + 0.4)}
-              icon={
-                <Ticker
-                  values={[
-                    [0, <CircleDashed key="new" size={15} className="w-ci" />],
-                    [JB.RUN, <LoaderCircle key="run" size={15} className="w-ci" />],
-                    [JB.DONE, <CircleCheck key="ok" size={15} className="w-ci ok" />],
-                  ]}
-                />
-              }
-              side={
-                <Ticker
-                  values={[
-                    [0, 'demain 9:30'],
-                    [JB.RUN, 'En cours…'],
-                    [JB.DONE, 'demain 9:30'],
-                  ]}
-                />
-              }
-            />
-          </span>
-        </Sheet>
-      </div>
-      <div className="w-layer w-span" style={span(JB.NEW + 0.2, JB.SAVE + 0.1)}>
-        <span className="w-scrim" />
-        <JobForm />
-      </div>
+      <style>{CL_CSS}</style>
+      <FileView className="w-out" style={d(CL.PAGE)} />
+      <SkillsList />
+      <SkillDetail />
+      <ClaudeCard
+        from={CL.EDIT + 0.4}
+        to={CL.DRAFT - 0.3}
+        left={590}
+        top={292}
+        title="gl_linear_issue.md"
+        ask="Ajoute Datadog à l’étape Contexte : les erreurs du service."
+        typed={CL.EDIT + 0.7}
+        answerAt={CL.EDIT + 1.9}
+        answer={
+          <>
+            <span>Fait, dans la section Contexte :</span>
+            <span className="w-cl-diff">
+              <span>## Contexte</span>
+              <span className="add">+ Datadog : search_datadog_logs sur le service</span>
+            </span>
+          </>
+        }
+      />
+      <McpPart />
+      <McpForm />
+      <TasksPart />
+      <TaskForm />
+      <TaskRuns />
+      <ClaudeCard
+        from={CL.SESSION + 0.3}
+        to={CL.END - 0.2}
+        left={600}
+        top={330}
+        title="Point Sentry du matin"
+        ask="Liste les nouvelles erreurs Sentry de la nuit et ouvre un ticket Linear pour chacune."
+        answerAt={CL.SESSION + 0.5}
+        answer={
+          <>
+            <span>3 nouvelles erreurs depuis hier soir :</span>
+            <span className="w-cl-diff">
+              <span>OFF-1102 · TypeError sur /planning</span>
+              <span>OFF-1103 · Timeout du sync agenda</span>
+              <span>OFF-1104 · 500 sur l’export CSV</span>
+            </span>
+          </>
+        }
+      />
+      <Toast from={CL.EDIT + 0.3} to={CL.EDIT + 1.6} text="Session ouverte dans Claude" top={430} />
+      <Toast from={CL.VALIDATE + 0.3} to={CL.VALIDATE + 1.8} text="/gl_linear_issue : v4 validée" top={430} />
+      <Toast from={CL.AUTHED + 0.1} to={CL.AUTHED + 1.6} text="Sentry : connecté" top={470} />
+      <Toast from={CL.ADDED + 0.3} to={CL.ADDED + 1.9} text="posthog ajouté : Claude le vérifie" top={424} />
+      <Toast from={CL.REMOVE + 0.4} to={CL.REMOVE + 1.8} text="Postgres retiré" top={470} />
     </Chrome>
   )
 }
@@ -1966,50 +3118,193 @@ export const SCENES: Scene[] = [
     Picture: SplitPicture,
   },
   {
-    id: 'jobs',
+    id: 'claude',
     rank: 5,
-    ms: 16500,
+    ms: CL_MS,
     captions: [
-      [0.3, 'L’onglet Claude : tes skills, tes MCP, et les tâches que Flux lance pour toi.'],
-      [JB.NEW - 0.6, 'Un prompt ou une skill, les jours et l’heure.'],
-      [JB.MCP - 0.8, 'Tu coches les MCP qu’il peut utiliser ; les autres lui sont refusés.'],
-      [JB.RUN - 0.6, 'À l’heure dite, ou d’un clic, Claude s’en charge.'],
-      [JB.DONE, 'Chaque exécution est une session, à rouvrir dans Claude.'],
+      [0.3, 'L’onglet Claude : ce que Claude fait pour toi, réuni dans Flux.'],
+      [2.4, 'Tes skills, du dernier lancé au plus ancien.'],
+      [4.4, 'Les tiens d’un côté, ceux des plugins de l’autre.'],
+      [CL.OPEN - 0.6, 'Ouvre-en un…'],
+      [CL.GRAPH - 0.1, '…il se lit comme un graphe : chaque étape mène à la suivante.'],
+      [9.6, 'Sous chaque étape, ce qu’elle appelle : MCP, commandes, skills, fichiers.'],
+      [11.2, 'Glisse pour suivre la procédure jusqu’au bout.'],
+      [13.2, 'Édite-le dans Claude, comme d’habitude…'],
+      [CL.DRAFT - 0.1, '…Flux voit le brouillon : le graphe suit le fichier.'],
+      [CL.VALIDATE - 0.4, 'Valide : la v4 devient la version de référence.'],
+      [CL.MENU - 0.4, 'Les versions d’avant restent lisibles, figées en lecture seule.'],
+      [23.6, 'Tes serveurs MCP, et l’état que claude mcp list leur donne.'],
+      [CL.AUTH - 0.6, 'À connecter ? Un clic lance la connexion.'],
+      [CL.ADD - 0.6, 'Ajoute un serveur : Flux passe par claude mcp add.'],
+      [CL.TRASH - 0.8, 'Et retire ce qui ne sert plus, en deux clics.'],
+      [CL.TASKS - 0.6, 'Les tâches que Flux lance pour toi, le daily en tête.'],
+      [CL.NEW - 0.4, 'Une tâche : un prompt ou une skill, les jours, l’heure…'],
+      [CL.ALLOW - 0.9, '…et les seuls MCP qu’elle a le droit d’utiliser.'],
+      [CL.RUN - 0.6, 'À l’heure dite, ou d’un clic : Claude s’en charge.'],
+      [CL.ROW - 0.4, 'Chaque exécution se rouvre dans Claude.'],
+      [CL.END, 'Skills, MCP, tâches : ce que Claude fait pour toi, dans Flux.'],
     ],
     cam: [
       cam(0, WINDOW_VIEW),
-      cam(JB.MCP - 1.2, WINDOW_VIEW),
-      [JB.MCP - 0.5, 1.3, 480, 380],
-      [JB.SAVE - 0.9, 1.3, 480, 380],
-      cam(JB.SAVE - 0.3, WINDOW_VIEW),
+      cam(2.2, WINDOW_VIEW),
+      [2.9, 1.12, 480, 330],
+      [CL.OPEN + 0.2, 1.12, 480, 330],
+      [CL.OPEN + 0.8, 1.08, 480, 322],
+      [9.6, 1.08, 480, 322],
+      [10.2, 1.5, 590, 395],
+      [11, 1.5, 590, 395],
+      [11.6, 1.08, 480, 322],
+      [13, 1.08, 480, 322],
+      [13.6, 1.2, 560, 320],
+      [23.4, 1.2, 560, 320],
+      [24, 1.12, 480, 330],
+      [CL.ADD + 0.3, 1.12, 480, 330],
+      [CL.ADD + 0.9, 1.25, 480, 300],
+      [CL.ADDED + 0.2, 1.25, 480, 300],
+      [CL.ADDED + 0.8, 1.12, 480, 330],
+      [CL.NEW + 0.2, 1.12, 480, 330],
+      [CL.NEW + 0.8, 1.15, 480, 320],
+      [CL.ALLOW - 0.9, 1.15, 480, 320],
+      [CL.ALLOW - 0.3, 1.5, 400, 400],
+      [CL.ALLOW + 0.9, 1.5, 400, 400],
+      [CL.CREATE - 0.3, 1.15, 480, 320],
+      [CL.CREATE + 0.3, 1.15, 480, 320],
+      [CL.CREATE + 0.9, 1.12, 480, 330],
+      [CL.ROW + 0.1, 1.12, 480, 330],
+      [CL.ROW + 0.7, 1.25, 480, 300],
+      [CL.SESSION + 0.1, 1.25, 480, 300],
+      [CL.SESSION + 0.7, 1.15, 540, 330],
+      [CL.END - 0.4, 1.15, 540, 330],
+      cam(CL.END + 0.4, WINDOW_VIEW),
     ],
     cursor: [
       [0, 600, 240, 0],
-      [0.3, 600, 240, 0],
-      [0.5, 600, 240],
-      [JB.TAB - 0.1, TAB_X['Claude'], TAB_Y],
-      [JB.TAB + 0.5, TAB_X['Claude'], TAB_Y],
-      [JB.NEW - 0.1, ...JB_NEW],
-      [JB.NEW + 0.5, ...JB_NEW],
-      [JB.MCP - 0.1, ...JB_SENTRY],
-      [JB.MCP + 0.5, ...JB_LINEAR],
-      [JB.MCP + 1.1, ...JB_LINEAR],
-      [JB.SAVE - 0.1, ...JB_SAVE],
-      [JB.SAVE + 0.5, ...JB_SAVE],
-      [JB.RUN - 0.1, ...JB_PLAY],
-      [JB.RUN + 0.6, ...JB_PLAY],
-      [JB.RUN + 1, ...JB_PLAY, 0],
+      [0.4, 600, 240, 0],
+      [0.6, 600, 240],
+      [CL.TAB - 0.1, TAB_X['Claude'], TAB_Y],
+      [CL.TAB + 0.4, TAB_X['Claude'], TAB_Y],
+      [2.4, 560, 168],
+      [4.3, 560, 168],
+      [CL.FILTER - 0.1, ...CL_AT.mine],
+      [CL.FILTER + 0.5, ...CL_AT.mine],
+      [CL.OPEN - 0.1, ...CL_AT.skill],
+      [CL.OPEN + 0.4, ...CL_AT.skill],
+      [7.7, 900, 250],
+      [7.9, 900, 250, 0],
+      [CL.PAN - 0.5, ...CL_AT.grab, 0],
+      [CL.PAN - 0.3, ...CL_AT.grab],
+      [CL.PAN, ...CL_AT.grab],
+      [CL.PANNED, ...CL_AT.drop],
+      [CL.PANNED + 0.2, ...CL_AT.drop],
+      [CL.EDIT - 0.1, ...CL_AT.edit],
+      [CL.EDIT + 0.3, ...CL_AT.edit],
+      [14.7, 880, 250],
+      [18.4, 880, 250],
+      [CL.VALIDATE - 0.1, ...CL_AT.validate],
+      [CL.VALIDATE + 0.3, ...CL_AT.validate],
+      [CL.MENU - 0.1, ...CL_AT.version],
+      [CL.MENU + 0.3, ...CL_AT.version],
+      [CL.PICK - 0.15, ...CL_AT.older],
+      [CL.PICK + 0.3, ...CL_AT.older],
+      [22.4, 720, 300],
+      [23.6, 720, 300],
+      [CL.MCP - 0.1, ...CL_AT.mcpPart],
+      [CL.MCP + 0.4, ...CL_AT.mcpPart],
+      [25.2, 560, 168],
+      [27.1, 560, 168],
+      [CL.AUTH - 0.1, ...CL_AT.connect],
+      [CL.AUTH + 0.4, ...CL_AT.connect],
+      [29.2, 620, 168],
+      [30.5, 620, 168],
+      [CL.ADD - 0.1, ...CL_AT.add],
+      [CL.ADD + 0.3, ...CL_AT.add],
+      [CL.NAME - 0.2, ...CL_AT.name],
+      [CL.NAME + 0.4, ...CL_AT.name],
+      [CL.URL - 0.2, ...CL_AT.url],
+      [CL.URL + 0.8, ...CL_AT.url],
+      [CL.ADDED - 0.1, ...CL_AT.addSave],
+      [CL.ADDED + 0.3, ...CL_AT.addSave],
+      [34.9, 600, 168],
+      [35.9, 600, 168],
+      [CL.TRASH - 0.1, ...CL_AT.trash],
+      [CL.TRASH + 0.2, ...CL_AT.trash],
+      [CL.REMOVE - 0.1, ...CL_AT.confirm],
+      [CL.REMOVE + 0.3, ...CL_AT.confirm],
+      [38.2, 560, 168],
+      [38.9, 560, 168],
+      [CL.TASKS - 0.1, ...CL_AT.tasksPart],
+      [CL.TASKS + 0.3, ...CL_AT.tasksPart],
+      [40.3, 560, 168],
+      [41.6, 560, 168],
+      [CL.NEW - 0.1, ...CL_AT.newTask],
+      [CL.NEW + 0.3, ...CL_AT.newTask],
+      [CL.TITLE - 0.2, ...CL_AT.title],
+      [CL.TITLE + 0.3, ...CL_AT.title],
+      [CL.PROMPT - 0.2, ...CL_AT.prompt],
+      [CL.PROMPT + 0.4, ...CL_AT.prompt],
+      [CL.ALLOW - 0.1, ...CL_AT.sentry],
+      [CL.ALLOW + 0.2, ...CL_AT.sentry],
+      [CL.ALLOW + 0.4, ...CL_AT.linear],
+      [CL.ALLOW + 0.7, ...CL_AT.linear],
+      [CL.CREATE - 0.1, ...CL_AT.create],
+      [CL.CREATE + 0.3, ...CL_AT.create],
+      [48.4, 600, 168],
+      [48.7, 600, 168],
+      [CL.RUN - 0.1, ...CL_AT.play],
+      [CL.RUN + 0.4, ...CL_AT.play],
+      [51.1, ...CL_AT.play],
+      [CL.ROW - 0.1, ...CL_AT.row],
+      [CL.ROW + 0.3, ...CL_AT.row],
+      [CL.SESSION - 0.1, ...CL_AT.session],
+      [CL.SESSION + 0.3, ...CL_AT.session],
+      [CL.SESSION + 0.6, ...CL_AT.session, 0],
     ],
     clicks: [
-      [JB.TAB, TAB_X['Claude'], TAB_Y],
-      [JB.NEW, ...JB_NEW],
-      [JB.MCP, ...JB_SENTRY],
-      [JB.MCP + 0.6, ...JB_LINEAR],
-      [JB.SAVE, ...JB_SAVE],
-      [JB.RUN, ...JB_PLAY],
+      [CL.TAB, TAB_X['Claude'], TAB_Y],
+      [CL.FILTER, ...CL_AT.mine],
+      [CL.OPEN, ...CL_AT.skill],
+      [CL.PAN, ...CL_AT.grab],
+      [CL.EDIT, ...CL_AT.edit],
+      [CL.VALIDATE, ...CL_AT.validate],
+      [CL.MENU, ...CL_AT.version],
+      [CL.PICK, ...CL_AT.older],
+      [CL.MCP, ...CL_AT.mcpPart],
+      [CL.AUTH, ...CL_AT.connect],
+      [CL.ADD, ...CL_AT.add],
+      [CL.NAME - 0.1, ...CL_AT.name],
+      [CL.URL - 0.1, ...CL_AT.url],
+      [CL.ADDED, ...CL_AT.addSave],
+      [CL.TRASH, ...CL_AT.trash],
+      [CL.REMOVE, ...CL_AT.confirm],
+      [CL.TASKS, ...CL_AT.tasksPart],
+      [CL.NEW, ...CL_AT.newTask],
+      [CL.TITLE - 0.1, ...CL_AT.title],
+      [CL.PROMPT - 0.1, ...CL_AT.prompt],
+      [CL.ALLOW, ...CL_AT.sentry],
+      [CL.ALLOW + 0.5, ...CL_AT.linear],
+      [CL.CREATE, ...CL_AT.create],
+      [CL.RUN, ...CL_AT.play],
+      [CL.ROW, ...CL_AT.row],
+      [CL.SESSION, ...CL_AT.session],
     ],
-    focus: [tabFocus('Claude', JB.TAB - 0.9, JB.TAB + 0.3), [JB.DONE + 0.2, 16, 166, 244, 628, 52, 16]],
-    Picture: JobsPicture,
+    focus: [
+      tabFocus('Claude', 0.6, CL.TAB + 0.3),
+      [2.9, 4.2, 688, 222, 100, 342, 14],
+      [4.5, CL.FILTER + 0.5, 288, 182, 236, 38, 19],
+      [9.9, 11, 432, 328, 316, 134, 14],
+      [CL.DRAFT + 0.7, CL.DRAFT + 1.8, 610, 439, 136, 69, 14],
+      [CL.VALIDATE - 0.4, CL.VALIDATE + 0.3, 782, 121, 124, 38, 19],
+      [CL.PICK + 0.5, CL.PICK + 1.7, 270, 209, 220, 28, 14],
+      [23.6, CL.MCP + 0.2, 56, 76, 198, 42, 21],
+      [CL.AUTH - 0.5, CL.AUTHED + 0.8, 164, 270, 632, 56, 16],
+      [CL.ADD - 0.6, CL.ADD + 0.1, 658, 182, 136, 38, 19],
+      [CL.TRASH - 0.7, CL.REMOVE + 0.4, 164, 366, 632, 56, 16],
+      [CL.TASKS + 0.6, CL.NEW - 0.8, 164, 222, 632, 56, 16],
+      [CL.ALLOW - 0.3, CL.ALLOW + 0.9, 256, 380, 448, 88, 14],
+      [CL.RUN - 0.4, CL.RAN + 0.3, 164, 318, 632, 56, 16],
+      [CL.SESSION - 0.5, CL.SESSION + 0.2, 258, 249, 444, 58, 14],
+    ],
+    Picture: ClaudePicture,
   },
 ]
 
